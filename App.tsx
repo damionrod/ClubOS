@@ -14,6 +14,9 @@ import { Applications } from '@/pages/admin/Applications';
 import { CustomFields } from '@/pages/admin/CustomFields';
 import { TeamsPage } from '@/pages/admin/TeamsPage';
 import { ComingSoon } from '@/pages/admin/ComingSoon';
+import { EventsPage } from '@/pages/admin/EventsPage';
+import { EventCheckin } from '@/pages/admin/EventCheckin';
+import { MemberEvents } from '@/pages/member/MemberEvents';
 import { MemberDashboard } from '@/pages/member/MemberDashboard';
 import { PlatformDashboard } from '@/pages/platform/PlatformDashboard';
 import type { ReactNode } from 'react';
@@ -76,8 +79,8 @@ function AppRoutes() {
       <Route path="/admin/sports" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Sports" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/finance" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Finance Dashboard" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/finance/transactions" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Transactions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/events" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Events" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/events/checkin" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Event Check-in" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/events" element={<ProtectedRoute><PermissionLoader><AdminRoute><EventsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/events/checkin" element={<ProtectedRoute><PermissionLoader><AdminRoute><EventCheckin /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/communications" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Communications" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/communications/send" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Send Email" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/communications/history" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Communication History" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
@@ -102,7 +105,7 @@ function AppRoutes() {
       {/* Member Portal */}
       <Route path="/member" element={<ProtectedRoute><MemberLayout><MemberDashboard /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/membership" element={<ProtectedRoute><MemberLayout><ComingSoon title="My Membership" /></MemberLayout></ProtectedRoute>} />
-      <Route path="/member/events" element={<ProtectedRoute><MemberLayout><ComingSoon title="Events" /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/events" element={<ProtectedRoute><MemberLayout><MemberEvents /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/payments" element={<ProtectedRoute><MemberLayout><ComingSoon title="Payments" /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/more" element={<ProtectedRoute><MemberLayout><ComingSoon title="More" /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><ComingSoon title="My Profile" /></MemberLayout></ProtectedRoute>} />
