@@ -13,7 +13,7 @@ import { MembershipTypes } from '@/pages/admin/MembershipTypes';
 import { Applications } from '@/pages/admin/Applications';
 import { CustomFields } from '@/pages/admin/CustomFields';
 import { TeamsPage } from '@/pages/admin/TeamsPage';
-import { ComingSoon } from '@/pages/admin/ComingSoon';
+import { AddMember } from '@/pages/admin/AddMember';
 import { EventsPage } from '@/pages/admin/EventsPage';
 import { EventCheckin } from '@/pages/admin/EventCheckin';
 import { MemberEvents } from '@/pages/member/MemberEvents';
@@ -74,7 +74,7 @@ function AppRoutes() {
       <Route path="/admin" element={<ProtectedRoute><PermissionLoader><AdminRoute><AdminDashboard /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/members" element={<ProtectedRoute><PermissionLoader><AdminRoute><MemberRegister /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/members/:id" element={<ProtectedRoute><PermissionLoader><AdminRoute><MemberDetail /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/members/new" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Add Member" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/members/new" element={<ProtectedRoute><PermissionLoader><AdminRoute><AddMember /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/applications" element={<ProtectedRoute><PermissionLoader><AdminRoute><Applications /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/membership-types" element={<ProtectedRoute><PermissionLoader><AdminRoute><MembershipTypes /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/custom-fields" element={<ProtectedRoute><PermissionLoader><AdminRoute><CustomFields /></AdminRoute></PermissionLoader></ProtectedRoute>} />
