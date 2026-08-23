@@ -292,7 +292,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO teams (organisation_id, sport_id, name, season, description, contact, status)
 SELECT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', s.id, 'Senior Rugby', '2025', 'Senior rugby squad', 'senior.rugby@demosportsclub.example', 'active'
-FROM sports s WHERE s.organisation_id = 'a0eebc99-9c0b-4ef8-bd6d-6bb9bd380a11' AND s.name = 'Rugby'
+FROM sports s WHERE s.organisation_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' AND s.name = 'Rugby'
 ON CONFLICT DO NOTHING;
 
 -- ============================================================

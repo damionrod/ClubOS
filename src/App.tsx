@@ -19,6 +19,9 @@ import { EventCheckin } from '@/pages/admin/EventCheckin';
 import { MemberEvents } from '@/pages/member/MemberEvents';
 import { MemberDashboard } from '@/pages/member/MemberDashboard';
 import { PlatformDashboard } from '@/pages/platform/PlatformDashboard';
+import { DemoModulePage } from '@/pages/admin/DemoModules';
+import { PlatformDemoPage } from '@/pages/platform/PlatformDemoPages';
+import { MemberMembership, MemberProfile, MemberPayments, MemberMore } from '@/pages/member/MemberDemoPages';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children, requirePlatformAdmin = false }: { children: ReactNode; requirePlatformAdmin?: boolean }) {
@@ -76,54 +79,54 @@ function AppRoutes() {
       <Route path="/admin/membership-types" element={<ProtectedRoute><PermissionLoader><AdminRoute><MembershipTypes /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/custom-fields" element={<ProtectedRoute><PermissionLoader><AdminRoute><CustomFields /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/teams" element={<ProtectedRoute><PermissionLoader><AdminRoute><TeamsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/sports" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Sports" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/finance" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Finance Dashboard" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/finance/transactions" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Transactions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/sports" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="sports" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/finance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="finance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/finance/transactions" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="transactions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/events" element={<ProtectedRoute><PermissionLoader><AdminRoute><EventsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/events/checkin" element={<ProtectedRoute><PermissionLoader><AdminRoute><EventCheckin /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/communications" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Communications" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/communications/send" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Send Email" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/communications/history" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Communication History" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/governance" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Governance Dashboard" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/governance/committee" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Committee" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/governance/motions" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Motions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/documents" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Documents" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/merchandise" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Merchandise" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/donations" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Donations" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/contacts" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Organisations & Contacts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/contracts" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Contracts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/tasks" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Tasks & Compliance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/privacy" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Privacy & Data Governance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/compliance" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Regulatory Compliance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/reports" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Reports & Analytics" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/settings" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Club Details" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/settings/branding" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Branding" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/settings/users" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Users" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/settings/roles" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Roles" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/settings/modules" element={<ProtectedRoute><PermissionLoader><AdminRoute><ComingSoon title="Modules" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/communications" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="communications" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/communications/send" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="send" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/communications/history" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="history" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/governance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="governance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/governance/committee" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="committee" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/governance/motions" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="motions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/documents" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="documents" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/merchandise" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="merchandise" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/donations" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="donations" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/contacts" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="contacts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/contracts" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="contracts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/tasks" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="tasks" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/privacy" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="privacy" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/compliance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="compliance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/reports" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="reports" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/settings" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="clubsettings" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/settings/branding" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="branding" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/settings/users" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="users" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/settings/roles" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="roles" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/settings/modules" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="modules" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
 
       {/* Member Portal */}
       <Route path="/member" element={<ProtectedRoute><MemberLayout><MemberDashboard /></MemberLayout></ProtectedRoute>} />
-      <Route path="/member/membership" element={<ProtectedRoute><MemberLayout><ComingSoon title="My Membership" /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/membership" element={<ProtectedRoute><MemberLayout><MemberMembership /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/events" element={<ProtectedRoute><MemberLayout><MemberEvents /></MemberLayout></ProtectedRoute>} />
-      <Route path="/member/payments" element={<ProtectedRoute><MemberLayout><ComingSoon title="Payments" /></MemberLayout></ProtectedRoute>} />
-      <Route path="/member/more" element={<ProtectedRoute><MemberLayout><ComingSoon title="More" /></MemberLayout></ProtectedRoute>} />
-      <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><ComingSoon title="My Profile" /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/payments" element={<ProtectedRoute><MemberLayout><MemberPayments /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/more" element={<ProtectedRoute><MemberLayout><MemberMore /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><MemberProfile /></MemberLayout></ProtectedRoute>} />
 
       {/* Platform Admin Portal */}
       <Route path="/platform-admin" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDashboard /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/organisations" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Organisations" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/plans" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Subscription Plans" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/modules" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Modules & Add-ons" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/subscriptions" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Subscriptions" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/billing" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Platform Billing" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/usage" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Platform Usage" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/support" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Support" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/privacy" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Privacy & Compliance" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/users" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Platform Users" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/monitoring" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="System Monitoring" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/reports" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Reports" /></PlatformLayout></ProtectedRoute>} />
-      <Route path="/platform-admin/settings" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><ComingSoon title="Platform Settings" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/organisations" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="organisations" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/plans" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="plans" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/modules" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="modules" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/subscriptions" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="subscriptions" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/billing" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="billing" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/usage" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="usage" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/support" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="support" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/privacy" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="privacy" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/users" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="users" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/monitoring" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="monitoring" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/reports" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="reports" /></PlatformLayout></ProtectedRoute>} />
+      <Route path="/platform-admin/settings" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDemoPage kind="settings" /></PlatformLayout></ProtectedRoute>} />
 
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />

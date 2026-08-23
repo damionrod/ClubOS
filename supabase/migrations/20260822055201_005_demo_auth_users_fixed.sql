@@ -13,6 +13,7 @@ Links each user to Demo Sports Club with appropriate roles.
 4. teammanager@demosportsclub.example — Team Manager
 5. readonly@demosportsclub.example — Read Only Administrator
 6. platform.admin@clubos.example — Platform Super Admin
+7. member@demosportsclub.example — Member Portal
 
 All passwords: DemoClub2025!
 */
@@ -26,7 +27,8 @@ DELETE FROM auth.users WHERE email IN (
   'treasurer@demosportsclub.example',
   'teammanager@demosportsclub.example',
   'readonly@demosportsclub.example',
-  'platform.admin@clubos.example'
+  'platform.admin@clubos.example',
+  'member@demosportsclub.example'
 );
 
 -- Create auth users
@@ -82,6 +84,14 @@ INSERT INTO auth.users (
    '{"provider":"email","providers":["email"]}',
    '{"first_name":"Platform","last_name":"Admin"}',
    '', '', false, false
+  ),
+  ('00000000-0000-0000-0000-000000000000',
+   gen_random_uuid(), 'authenticated', 'authenticated',
+   'member@demosportsclub.example',
+   crypt('DemoClub2025!', gen_salt('bf')), now(), now(), now(),
+   '{"provider":"email","providers":["email"]}',
+   '{"first_name":"Sarah","last_name":"Connors"}',
+   '', '', false, false
   );
 
 -- Link users to Demo Sports Club with roles
@@ -120,6 +130,14 @@ SELECT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', u.id,
 FROM auth.users u WHERE u.email = 'readonly@demosportsclub.example'
 ON CONFLICT (organisation_id, user_id) DO NOTHING;
 
+-- Member portal user link
+INSERT INTO organisation_users (organisation_id, user_id, role_id, is_owner, status)
+SELECT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', u.id,
+  (SELECT id FROM roles WHERE organisation_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' AND name = 'Member'),
+  false, 'active'
+FROM auth.users u WHERE u.email = 'member@demosportsclub.example'
+ON CONFLICT (organisation_id, user_id) DO NOTHING;
+
 -- Assign user_roles
 INSERT INTO user_roles (organisation_id, user_id, role_id)
 SELECT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', u.id,
@@ -151,6 +169,12 @@ SELECT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', u.id,
 FROM auth.users u WHERE u.email = 'readonly@demosportsclub.example'
 ON CONFLICT DO NOTHING;
 
+INSERT INTO user_roles (organisation_id, user_id, role_id)
+SELECT 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', u.id,
+  (SELECT id FROM roles WHERE organisation_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' AND name = 'Member')
+FROM auth.users u WHERE u.email = 'member@demosportsclub.example'
+ON CONFLICT DO NOTHING;
+
 -- Set platform admin flag for platform.admin user
 UPDATE profiles SET is_platform_admin = true
 WHERE email = 'platform.admin@clubos.example';
@@ -166,3 +190,19 @@ UPDATE members SET user_id = (
   SELECT id FROM auth.users WHERE email = 'teammanager@demosportsclub.example'
 )
 WHERE organisation_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' AND member_number = 'DSC-000005';
+
+-- Link dedicated member portal account
+UPDATE members SET user_id = (SELECT id FROM auth.users WHERE email = 'member@demosportsclub.example')
+WHERE organisation_id = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' AND member_number = 'DSC-000002';
+
+-- Prevent Supabase Auth schema errors for manually seeded users
+UPDATE auth.users SET
+  confirmation_token = COALESCE(confirmation_token, ''),
+  recovery_token = COALESCE(recovery_token, ''),
+  email_change = COALESCE(email_change, ''),
+  email_change_token_new = COALESCE(email_change_token_new, ''),
+  email_change_token_current = COALESCE(email_change_token_current, ''),
+  phone_change = COALESCE(phone_change, ''),
+  phone_change_token = COALESCE(phone_change_token, ''),
+  reauthentication_token = COALESCE(reauthentication_token, '')
+WHERE email LIKE '%@demosportsclub.example' OR email='platform.admin@clubos.example';

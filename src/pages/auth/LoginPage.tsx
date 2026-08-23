@@ -32,6 +32,8 @@ export function LoginPage() {
           .maybeSingle();
         if (profileData?.is_platform_admin) {
           navigate('/platform-admin');
+        } else if (user.email === 'member@demosportsclub.example') {
+          navigate('/member');
         } else {
           navigate('/admin');
         }
@@ -141,6 +143,10 @@ export function LoginPage() {
             <button onClick={() => fillDemo('readonly@demosportsclub.example')} className="flex justify-between rounded px-2 py-1 hover:bg-slate-100">
               <span>Read Only Admin</span>
               <span className="text-slate-400">readonly@...</span>
+            </button>
+            <button onClick={() => fillDemo('member@demosportsclub.example')} className="flex justify-between rounded px-2 py-1 hover:bg-slate-100">
+              <span>Member Portal</span>
+              <span className="text-slate-400">member@...</span>
             </button>
             <button onClick={() => fillDemo('platform.admin@clubos.example')} className="flex justify-between rounded px-2 py-1 hover:bg-slate-100">
               <span>Platform Admin</span>
