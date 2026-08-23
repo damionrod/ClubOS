@@ -4,6 +4,7 @@ import { Home, User, Calendar, CreditCard, MoreHorizontal, LogOut, ArrowLeft } f
 import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
+import { useOrganisationBranding } from '@/hooks/useOrganisationBranding';
 
 const bottomNav = [
   { label: 'Home', icon: Home, path: '/member' },
@@ -16,15 +17,20 @@ const bottomNav = [
 export function MemberLayout({ children }: { children: ReactNode }) {
   const { profile, activeOrg, signOut } = useAuth();
   const location = useLocation();
+  const { branding } = useOrganisationBranding(activeOrg?.id);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-700 text-white text-sm font-bold">
-              {activeOrg?.trading_name?.[0] ?? 'C'}
-            </div>
+            {branding?.logo_url ? (
+              <img src={branding.logo_url} alt={`${activeOrg?.trading_name ?? 'Club'} logo`} className="h-8 w-8 rounded-lg border border-slate-200 bg-white object-contain p-0.5" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-700 text-white text-sm font-bold">
+                {activeOrg?.trading_name?.[0] ?? 'C'}
+              </div>
+            )}
             <span className="text-sm font-semibold text-slate-900">{activeOrg?.trading_name ?? 'ClubOS'}</span>
           </div>
           <div className="flex items-center gap-2">

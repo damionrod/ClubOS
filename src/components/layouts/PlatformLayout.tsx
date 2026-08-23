@@ -16,6 +16,7 @@ const navItems = [
   { label: 'Modules & Add-ons', icon: Boxes, path: '/platform-admin/modules' },
   { label: 'Subscriptions', icon: CalendarClock, path: '/platform-admin/subscriptions' },
   { label: 'Platform Billing', icon: TrendingUp, path: '/platform-admin/billing' },
+  { label: 'Transaction Fees', icon: CreditCard, path: '/platform-admin/transaction-fees' },
   { label: 'Usage', icon: Activity, path: '/platform-admin/usage' },
   { label: 'Support', icon: LifeBuoy, path: '/platform-admin/support' },
   { label: 'Privacy & Compliance', icon: ShieldCheck, path: '/platform-admin/privacy' },

@@ -8,7 +8,7 @@ import { SearchBar } from '@/components/ui/SearchBar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Select } from '@/components/ui/FormField';
-import { Users, UserPlus } from 'lucide-react';
+import { Users, UserPlus, Upload } from 'lucide-react';
 import { formatDate, fullName } from '@/lib/utils';
 import type { Member } from '@/types/database';
 
@@ -119,9 +119,10 @@ export function MemberRegister() {
         title="Member Register"
         description={`${total} members`}
         actions={
-          <Link to="/admin/members/new" className="btn-primary">
-            <UserPlus className="h-4 w-4" /> Add Member
-          </Link>
+          <div className="flex gap-2">
+            <Link to="/admin/members/import" className="btn-secondary"><Upload className="h-4 w-4" /> Import CSV / Excel</Link>
+            <Link to="/admin/members/new" className="btn-primary"><UserPlus className="h-4 w-4" /> Add Member</Link>
+          </div>
         }
       />
 

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { FormField, Select, TextArea, TextInput } from '@/components/ui/FormField';
@@ -13,6 +13,8 @@ export function AddMember() {
   const [types,setTypes] = useState<MembershipType[]>([]);
   const [saving,setSaving] = useState(false);
   const [error,setError] = useState('');
+  const [photo,setPhoto] = useState<File|null>(null);
+  const [photoPreview,setPhotoPreview] = useState('');
   const [form,setForm] = useState({ first_name:'', last_name:'', preferred_name:'', email:'', mobile:'', date_of_birth:'', address_line1:'', suburb:'', city:'', region:'', postcode:'', country:'New Zealand', status:'active', membership_type_id:'', emergency_name:'', emergency_relationship:'', emergency_mobile:'', medical_conditions:'', allergies:'', dietary_requirements:'', guardian_name:'', guardian_relationship:'Parent', guardian_email:'', guardian_mobile:'' });
   useEffect(()=>{ if(activeOrg) supabase.from('membership_types').select('id,name,voting_rights').eq('organisation_id',activeOrg.id).eq('is_active',true).order('sort_order').then(({data})=>setTypes((data??[]) as MembershipType[])); },[activeOrg]);
   const set=(k:string,v:string)=>setForm(f=>({...f,[k]:v}));
@@ -23,6 +25,15 @@ export function AddMember() {
       const memberNumber = `DSC-${String((count??0)+1).padStart(6,'0')}`;
       const selected = types.find(t=>t.id===form.membership_type_id);
       const { data:member,error:memberErr } = await supabase.from('members').insert({ organisation_id:activeOrg.id, member_number:memberNumber, first_name:form.first_name.trim(), last_name:form.last_name.trim(), preferred_name:form.preferred_name||null, email:form.email||null, mobile:form.mobile||null, date_of_birth:form.date_of_birth||null, address_line1:form.address_line1||null, suburb:form.suburb||null, city:form.city||null, region:form.region||null, postcode:form.postcode||null, country:form.country||null, status:form.status, joined_date:new Date().toISOString().slice(0,10), member_since:new Date().toISOString().slice(0,10), voting_eligible:selected?.voting_rights??false }).select('id').single();
+      if(photo){
+        const ext=(photo.name.split('.').pop()||'jpg').toLowerCase();
+        const path=`${activeOrg.id}/${member.id}/profile.${ext}`;
+        const {error:uploadError}=await supabase.storage.from('member-photos').upload(path,photo,{upsert:true,contentType:photo.type||undefined});
+        if(uploadError) throw uploadError;
+        const {data:urlData}=supabase.storage.from('member-photos').getPublicUrl(path);
+        const {error:photoUpdateError}=await supabase.from('members').update({photo_url:urlData.publicUrl}).eq('id',member.id);
+        if(photoUpdateError) throw photoUpdateError;
+      }
       if(memberErr) throw memberErr;
       if(form.membership_type_id) { const {error}=await supabase.from('memberships').insert({organisation_id:activeOrg.id,member_id:member.id,membership_type_id:form.membership_type_id,status:'active',start_date:new Date().toISOString().slice(0,10)}); if(error) throw error; }
       if(form.emergency_name){ const {error}=await supabase.from('member_emergency_contacts').insert({organisation_id:activeOrg.id,member_id:member.id,full_name:form.emergency_name,relationship:form.emergency_relationship||null,mobile:form.emergency_mobile||null}); if(error) throw error; }
@@ -39,6 +50,12 @@ export function AddMember() {
       <FormField label="First name" required><TextInput required value={form.first_name} onChange={e=>set('first_name',e.target.value)}/></FormField><FormField label="Last name" required><TextInput required value={form.last_name} onChange={e=>set('last_name',e.target.value)}/></FormField><FormField label="Preferred name"><TextInput value={form.preferred_name} onChange={e=>set('preferred_name',e.target.value)}/></FormField>
       <FormField label="Email"><TextInput type="email" value={form.email} onChange={e=>set('email',e.target.value)}/></FormField><FormField label="Mobile"><TextInput value={form.mobile} onChange={e=>set('mobile',e.target.value)}/></FormField><FormField label="Date of birth"><TextInput type="date" value={form.date_of_birth} onChange={e=>set('date_of_birth',e.target.value)}/></FormField>
       <FormField label="Address"><TextInput value={form.address_line1} onChange={e=>set('address_line1',e.target.value)}/></FormField><FormField label="Suburb"><TextInput value={form.suburb} onChange={e=>set('suburb',e.target.value)}/></FormField><FormField label="City"><TextInput value={form.city} onChange={e=>set('city',e.target.value)}/></FormField><FormField label="Region"><TextInput value={form.region} onChange={e=>set('region',e.target.value)}/></FormField><FormField label="Postcode"><TextInput value={form.postcode} onChange={e=>set('postcode',e.target.value)}/></FormField><FormField label="Country"><TextInput value={form.country} onChange={e=>set('country',e.target.value)}/></FormField>
+    </div></section>
+
+    <section className="card p-5"><h2 className="font-semibold">Member photo</h2><p className="mt-1 text-xs text-slate-500">Upload a clear JPG, PNG or WebP profile photo. Maximum 5 MB.</p><div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">{photoPreview?<img src={photoPreview} alt="Member preview" className="h-full w-full object-cover"/>:<ImageIcon className="h-8 w-8 text-slate-300"/>}</div>
+      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><Upload className="h-4 w-4"/>Choose photo<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>{const f=e.target.files?.[0]||null;if(f&&f.size>5*1024*1024){setError('Member photo must be 5 MB or smaller.');return;}setPhoto(f);setPhotoPreview(f?URL.createObjectURL(f):'')}}/></label>
+      {photo&&<button type="button" className="text-sm text-slate-500 hover:text-red-600" onClick={()=>{setPhoto(null);setPhotoPreview('')}}>Remove selected photo</button>}
     </div></section>
     <section className="card p-5"><h2 className="font-semibold">Membership</h2><div className="mt-4 grid gap-4 md:grid-cols-2"><FormField label="Membership type"><Select value={form.membership_type_id} onChange={e=>set('membership_type_id',e.target.value)}><option value="">No membership type</option>{types.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</Select></FormField><FormField label="Status"><Select value={form.status} onChange={e=>set('status',e.target.value)}><option value="active">Active</option><option value="pending">Pending</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></Select></FormField></div></section>
     <section className="card p-5"><h2 className="font-semibold">Emergency contact</h2><div className="mt-4 grid gap-4 md:grid-cols-3"><FormField label="Name"><TextInput value={form.emergency_name} onChange={e=>set('emergency_name',e.target.value)}/></FormField><FormField label="Relationship"><TextInput value={form.emergency_relationship} onChange={e=>set('emergency_relationship',e.target.value)}/></FormField><FormField label="Mobile"><TextInput value={form.emergency_mobile} onChange={e=>set('emergency_mobile',e.target.value)}/></FormField></div></section>

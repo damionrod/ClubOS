@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth';
 import { hasModuleAccess } from '@/lib/permissions';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
+import { useOrganisationBranding } from '@/hooks/useOrganisationBranding';
 import type { AccessLevel } from '@/types/database';
 
 interface NavItem {
@@ -79,6 +80,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
         children: [
           { label: 'Dashboard', path: '/admin/finance' },
           { label: 'Transactions', path: '/admin/finance/transactions' },
+          { label: 'Payment & Fee Settings', path: '/admin/finance/fees' },
         ],
       },
     ],
@@ -115,7 +117,10 @@ const navGroups: { title: string; items: NavItem[] }[] = [
   {
     title: 'Insights',
     items: [
-      { label: 'Reports & Analytics', icon: <BarChart3 className="h-4 w-4" />, module: 'reports', path: '/admin/reports' },
+      { label: 'Reports & Analytics', icon: <BarChart3 className="h-4 w-4" />, module: 'reports', children: [
+        { label: 'Reports Dashboard', path: '/admin/reports' },
+        { label: 'Income by Category', path: '/admin/reports/income-by-category' },
+      ] },
     ],
   },
   {
@@ -138,6 +143,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
 export function AdminLayout({ children }: { children: ReactNode }) {
   const { profile, activeOrg, orgMemberships, setActiveOrgId, signOut } = useAuth();
   const location = useLocation();
+  const { branding } = useOrganisationBranding(activeOrg?.id);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
 
@@ -171,9 +177,13 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       >
         <div className="flex h-16 items-center justify-between border-b border-slate-200 px-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-700 text-white font-bold text-sm">
-              {activeOrg?.trading_name?.[0] ?? 'C'}
-            </div>
+            {branding?.logo_url ? (
+              <img src={branding.logo_url} alt={`${activeOrg?.trading_name ?? 'Club'} logo`} className="h-9 w-9 rounded-lg border border-slate-200 bg-white object-contain p-1" />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-700 text-white font-bold text-sm">
+                {activeOrg?.trading_name?.[0] ?? 'C'}
+              </div>
+            )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-900">{activeOrg?.trading_name ?? 'ClubOS'}</p>
               <p className="text-xs text-slate-500">Admin Portal</p>
