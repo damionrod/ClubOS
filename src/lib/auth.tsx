@@ -80,42 +80,100 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadUserData(userId: string) {
     setLoading(true);
+
     try {
-      const { data: profileData } = await supabase
+      // Load the signed-in user's profile independently. A profile failure should
+      // not be mistaken for a missing organisation membership.
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
+
+      if (profileError) {
+        console.error('Profile load error:', profileError);
+      }
+
       setProfile(profileData as Profile | null);
 
-      const { data: orgUsers } = await supabase
+      // Fetch the link table first. This avoids relying on PostgREST's embedded
+      // relationship inference, which can fail when FK relationship names differ.
+      const { data: orgUsers, error: orgUsersError } = await supabase
         .from('organisation_users')
-        .select(
-          `organisation_id, is_owner, status, roles:id(*) , organisations:organisation_id(*)`,
-        )
+        .select('organisation_id, role_id, is_owner, status')
         .eq('user_id', userId)
         .eq('status', 'active');
 
-      const memberships: OrgMembership[] = (orgUsers ?? []).map((ou: any) => ({
-        organisation: ou.organisations as Organisation,
-        role: ou.roles as Role,
-        isOwner: ou.is_owner,
-      }));
+      if (orgUsersError) {
+        console.error('Organisation membership load error:', orgUsersError);
+        throw orgUsersError;
+      }
+
+      const memberships: OrgMembership[] = [];
+
+      for (const orgUser of orgUsers ?? []) {
+        const { data: organisation, error: organisationError } = await supabase
+          .from('organisations')
+          .select('*')
+          .eq('id', orgUser.organisation_id)
+          .maybeSingle();
+
+        if (organisationError) {
+          console.error(
+            'Organisation load error:',
+            orgUser.organisation_id,
+            organisationError,
+          );
+          continue;
+        }
+
+        if (!organisation) continue;
+
+        let role: Role | null = null;
+
+        if (orgUser.role_id) {
+          const { data: roleData, error: roleError } = await supabase
+            .from('roles')
+            .select('*')
+            .eq('id', orgUser.role_id)
+            .maybeSingle();
+
+          if (roleError) {
+            console.error('Role load error:', orgUser.role_id, roleError);
+          } else {
+            role = roleData as Role | null;
+          }
+        }
+
+        memberships.push({
+          organisation: organisation as Organisation,
+          role,
+          isOwner: orgUser.is_owner,
+        });
+      }
 
       setOrgMemberships(memberships);
 
       const storedOrgId = localStorage.getItem(ACTIVE_ORG_KEY);
-      const validStored = storedOrgId && memberships.some((m) => m.organisation.id === storedOrgId);
-      if (validStored) {
+      const validStored = Boolean(
+        storedOrgId && memberships.some((m) => m.organisation.id === storedOrgId),
+      );
+
+      if (validStored && storedOrgId) {
         setActiveOrgIdState(storedOrgId);
       } else if (memberships.length > 0) {
-        setActiveOrgIdState(memberships[0].organisation.id);
+        const firstOrgId = memberships[0].organisation.id;
+        setActiveOrgIdState(firstOrgId);
+        localStorage.setItem(ACTIVE_ORG_KEY, firstOrgId);
       } else {
         setActiveOrgIdState(null);
+        localStorage.removeItem(ACTIVE_ORG_KEY);
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to load ClubOS user data:', error);
       setProfile(null);
       setOrgMemberships([]);
+      setActiveOrgIdState(null);
     } finally {
       setLoading(false);
     }

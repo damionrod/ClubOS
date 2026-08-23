@@ -25,3 +25,8 @@ Password for seeded demo users: `DemoClub2025!`
 - platform.admin@clubos.example — Platform Admin
 
 The visible platform/admin demo pages are deliberately populated even if a specific extended module has not yet been wired to full CRUD. Use them to test navigation, layouts, search, exports and representative records.
+
+## Demo account link repair (008)
+If an existing Supabase project was set up before this package, run
+`supabase/migrations/20260824111500_008_repair_demo_user_links.sql` after 001-007.
+It safely repairs organisation/profile/role links using the current Auth user IDs.
