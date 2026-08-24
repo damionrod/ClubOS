@@ -149,20 +149,14 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 function OverviewTab({ member }: { member: Member }) {
   return (
-      <InfoCard title="Membership">
-        <InfoRow label="Member Number" value={<span className="font-mono text-xs">{member.member_number}</span>} />
-        <InfoRow label="Status" value={<StatusBadge status={member.status} />} />
-        <InfoRow label="Type" value={member.memberships?.[0]?.membership_types?.name} />
-        <InfoRow label="Member Since" value={formatDate(member.member_since)} />
-        <InfoRow label="Paid Until" value={member.paid_until ? formatDate(member.paid_until) : '—'} />
-        <InfoRow label="Voting Eligible" value={member.voting_eligible ? 'Yes' : 'No'} />
-      </InfoCard>
-      <InfoCard title="Contact">
-        <InfoRow label="Email" value={member.email} />
-        <InfoRow label="Mobile" value={member.mobile} />
-        <InfoRow label="City" value={member.city} />
-        <InfoRow label="Country" value={member.country} />
-      </InfoCard>
+    <InfoCard title="Membership">
+      <InfoRow label="Member Number" value={<span className="font-mono text-xs">{member.member_number}</span>} />
+      <InfoRow label="Status" value={<StatusBadge status={member.status} />} />
+      <InfoRow label="Type" value={member.memberships?.[0]?.membership_types?.name} />
+      <InfoRow label="Member Since" value={formatDate(member.member_since)} />
+      <InfoRow label="Paid Until" value={member.paid_until ? formatDate(member.paid_until) : '—'} />
+      <InfoRow label="Voting Eligible" value={member.voting_eligible ? 'Yes' : 'No'} />
+    </InfoCard>
   );
 }
 
