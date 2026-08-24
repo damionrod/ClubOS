@@ -9,9 +9,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLoader, TableSkeleton } from '@/components/ui/SkeletonLoader';
 import { hasPermission } from '@/lib/permissions';
 import { formatDate, fullName } from '@/lib/utils';
-import { ArrowLeft, ShieldAlert, Activity, Phone, Mail, MapPin, Heart, Users, Plus, Trash2, Award } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Activity, Phone, Users, Plus, Trash2, Award, Pencil } from 'lucide-react';
 import type { Member, MemberEmergencyContact, MemberGuardian, MemberMedicalInfo, MemberActivity } from '@/types/database';
 import { Select } from '@/components/ui/FormField';
+import { MemberEditModal } from '@/pages/admin/MemberEditModal';
 
 export function MemberDetail() {
   const { id } = useParams();
@@ -24,6 +25,8 @@ export function MemberDetail() {
   const [awards, setAwards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [editOpen, setEditOpen] = useState(false);
+  const canEdit = hasPermission('members.edit');
 
   useEffect(() => {
     if (!id || !activeOrg) return;
@@ -96,10 +99,12 @@ export function MemberDetail() {
       <PageHeader
         title={fullName(member.first_name, member.last_name, member.preferred_name)}
         description={`${member.member_number} · ${member.email ?? 'No email'}`}
-        actions={<StatusBadge status={member.status} />}
+        actions={<div className="flex items-center gap-2">{canEdit && <button type="button" className="btn-primary" onClick={()=>setEditOpen(true)}><Pencil className="h-4 w-4"/> Edit Member</button>}<StatusBadge status={member.status} /></div>}
       />
 
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+
+      {canEdit && <MemberEditModal member={member} open={editOpen} onClose={()=>setEditOpen(false)} onSaved={(updated)=>{setMember(updated);}} />}
 
       <div className="mt-4">
         {activeTab === 'overview' && <OverviewTab member={member} />}
@@ -286,7 +291,7 @@ function TeamsTab({ memberId }: { memberId: string }) {
   async function load() {
     if (!activeOrg) return;
     const [{ data: memberships }, { data: teamOptions }] = await Promise.all([
-      supabase.from('team_members').select('*, teams(name, season, sports(name))').eq('member_id', memberId).order('created_at'),
+      supabase.from('team_members').select('*, teams(id,name,season,sport_id)').eq('member_id', memberId).order('created_at'),
       supabase.from('teams').select('id,name,season,status').eq('organisation_id', activeOrg.id).eq('status','active').eq('is_archived',false).order('name'),
     ]);
     setTeams(memberships ?? []);
@@ -327,7 +332,7 @@ function TeamsTab({ memberId }: { memberId: string }) {
       {canManage && <div className="card p-4"><h3 className="text-sm font-semibold">Assign team</h3><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Select value={selectedTeamId} onChange={e=>setSelectedTeamId(e.target.value)}><option value="">Select an active team</option>{options.map(t=><option key={t.id} value={t.id}>{t.name}{t.season?` · ${t.season}`:''}</option>)}</Select><button type="button" onClick={addTeam} disabled={!selectedTeamId} className="btn-primary whitespace-nowrap"><Plus className="h-4 w-4"/>Add to team</button></div>{message&&<p className="mt-2 text-xs text-slate-600">{message}</p>}</div>}
       {teams.length === 0 ? <EmptyState icon={<Users className="h-6 w-6" />} title="Not in any teams" description={canManage?'Use the selector above to assign a team.':'No team assignment has been recorded.'} /> : <div className="space-y-3">{teams.map((t) => (
         <div key={t.id} className="card flex items-center justify-between gap-3 p-4">
-          <div><p className="text-sm font-semibold text-slate-900">{t.teams?.name}</p><p className="text-xs text-slate-500">{t.teams?.sports?.name} · {t.season || t.teams?.season || 'Current'} · {t.role}</p></div>
+          <div><p className="text-sm font-semibold text-slate-900">{t.teams?.name}</p><p className="text-xs text-slate-500">{t.season || t.teams?.season || 'Current'} · {t.role}</p></div>
           {canManage && <button type="button" onClick={()=>removeTeam(t.id)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5"/>Remove</button>}
         </div>
       ))}</div>}

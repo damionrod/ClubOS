@@ -35,6 +35,7 @@ import { MemberVoting } from '@/pages/member/MemberVoting';
 import { MotionsPage } from '@/pages/admin/MotionsPage';
 import { AwardsRecognition } from '@/pages/admin/AwardsRecognition';
 import { MemberNews } from '@/pages/member/MemberNews';
+import { PublicEvent } from '@/pages/public/PublicEvent';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children, requirePlatformAdmin = false }: { children: ReactNode; requirePlatformAdmin?: boolean }) {
@@ -82,6 +83,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/events/:slug" element={<PublicEvent />} />
 
       {/* Admin Portal */}
       <Route path="/admin" element={<ProtectedRoute><PermissionLoader><AdminRoute><AdminDashboard /></AdminRoute></PermissionLoader></ProtectedRoute>} />

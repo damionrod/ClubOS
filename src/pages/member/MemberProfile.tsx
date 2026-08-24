@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Award, Camera, Image as ImageIcon, Save, Trash2, UserRound } from 'lucide-react';
+import { Award, Camera, Home, Image as ImageIcon, Save, Trash2, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { FormField, Select, TextArea, TextInput } from '@/components/ui/FormField';
@@ -221,7 +222,7 @@ export function MemberProfile() {
   if (!member) return <div className="card p-6"><h1 className="text-xl font-bold">My Profile</h1><p className="mt-2 text-sm text-slate-500">No member record is linked to this login. Please contact your club administrator.</p></div>;
 
   return <form onSubmit={save} className="space-y-6">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-2xl font-bold text-slate-900">My Profile</h1><p className="text-sm text-slate-500">Update your contact, emergency and health information.</p></div><button disabled={saving} className="btn-primary"><Save className="h-4 w-4"/>{saving ? 'Saving…' : 'Save Changes'}</button></div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-2xl font-bold text-slate-900">My Profile</h1><p className="text-sm text-slate-500">Update your contact, emergency and health information.</p></div><div className="flex flex-wrap gap-2"><Link to="/member" className="btn-secondary"><Home className="h-4 w-4"/> Home</Link><button disabled={saving} className="btn-primary"><Save className="h-4 w-4"/>{saving ? 'Saving…' : 'Save Changes'}</button></div></div>
     {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {message && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{message}</div>}
 

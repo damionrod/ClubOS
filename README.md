@@ -1,16 +1,28 @@
-# ClubOS Compact Repository
+# ClubOS Compact v17
 
-This is the compact browser-upload version of ClubOS v16.
+Compact browser-uploadable repository (under 100 source files).
 
-## GitHub upload
-Upload the complete contents of this folder to the repository root. The package contains fewer than 100 files so GitHub's browser uploader can accept the full project in one upload. Preserve the folders (`src`, `public`, `supabase`).
+## v17 changes
+- Full-access admins can edit and save member core details from the Member Detail screen.
+- Each admin member update writes an `audit_logs` record with old/new values.
+- Member Teams tab query repaired to avoid the blank-screen relationship error.
+- Member Profile has a Home button.
+- Events can be created and edited, including banner upload and multiple ticket types (Family, Single, Child, etc.).
+- Published events have an external public URL at `/events/:slug` for ticket ordering.
+- Event banner storage uses the `event-banners` Supabase bucket.
+- QR check-in no longer relies on the browser-only BarcodeDetector API. It uses html5-qrcode, plus QR-image upload and manual-code fallbacks for mobile/older browsers.
 
-## Supabase
-- Existing ClubOS database already upgraded through migration 020: do **not** run `supabase/COMPLETE_SETUP.sql` again.
-- Brand-new/empty Supabase project: run `supabase/COMPLETE_SETUP.sql` once in the Supabase SQL Editor.
+## Existing Supabase database
+Run once in Supabase SQL Editor:
 
-## Netlify environment variables
-Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Netlify.
+`supabase/UPGRADE_COMPACT_V17.sql`
 
-## Important member profile route
-`/member/profile` uses `src/pages/member/MemberProfile.tsx` (editable profile/photo page), not the old read-only demo component.
+Do not run `COMPLETE_SETUP.sql` on an existing populated database.
+
+## Fresh Supabase database
+Run `supabase/COMPLETE_SETUP.sql` once.
+
+## Netlify
+Keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` configured in Netlify environment variables.
+
+Paid external event orders remain `pending` until Stripe/POLi webhook integration is connected. Free tickets are issued immediately.
