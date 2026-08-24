@@ -10,7 +10,7 @@ type Product = {
   id: string;
   name: string;
   description: string | null;
-  sku: string | null;
+  sizes: string[] | null;
   price: number;
   stock_quantity: number;
   status: string;
@@ -24,6 +24,7 @@ export function MemberMerchandise() {
 
   const [rows, setRows] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState('');
   const [error, setError] = useState('');
@@ -50,6 +51,9 @@ export function MemberMerchandise() {
           setQuantities(
             Object.fromEntries(products.map((product) => [product.id, 1])),
           );
+          setSelectedSizes(
+            Object.fromEntries(products.map((product) => [product.id, product.sizes?.[0] ?? ''])),
+          );
         }
         setLoading(false);
       });
@@ -65,6 +69,12 @@ export function MemberMerchandise() {
     if (!activeOrg || !profile || purchasing) return;
 
     const quantity = quantities[product.id] ?? 1;
+    const selectedSize = selectedSizes[product.id] ?? '';
+
+    if ((product.sizes?.length ?? 0) > 0 && !selectedSize) {
+      notifyError('Please select a size.');
+      return;
+    }
 
     if (product.stock_quantity <= 0) {
       notifyError('This item is out of stock.');
@@ -86,6 +96,7 @@ export function MemberMerchandise() {
       unit_price: Number(product.price),
       total_amount: Number(product.price) * quantity,
       payment_status: Number(product.price) === 0 ? 'free' : 'pending',
+      selected_size: selectedSize || null,
     });
 
     setPurchasing('');
@@ -173,7 +184,7 @@ export function MemberMerchandise() {
                         {product.name}
                       </h2>
                       <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-                        SKU: {product.sku || 'N/A'}
+                        {product.sizes?.length ? `${product.sizes.length} size option${product.sizes.length === 1 ? '' : 's'}` : 'One size'}
                       </p>
                     </div>
 
@@ -193,6 +204,26 @@ export function MemberMerchandise() {
                       ? 'Currently unavailable'
                       : `${product.stock_quantity} in stock`}
                   </p>
+
+                  {(product.sizes?.length ?? 0) > 0 && (
+                    <div className="mt-4">
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">Size</label>
+                      <select
+                        className="input w-full"
+                        value={selectedSizes[product.id] ?? ''}
+                        onChange={(e) =>
+                          setSelectedSizes((current) => ({
+                            ...current,
+                            [product.id]: e.target.value,
+                          }))
+                        }
+                      >
+                        {product.sizes!.map((size) => (
+                          <option key={size} value={size}>{size}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="mt-5 flex items-center justify-between gap-3">
                     <div className="inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
