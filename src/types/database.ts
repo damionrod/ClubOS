@@ -315,6 +315,7 @@ export interface Sport {
   organisation_id: string;
   name: string;
   description: string | null;
+  season?: string | null;
   status: string;
 }
 

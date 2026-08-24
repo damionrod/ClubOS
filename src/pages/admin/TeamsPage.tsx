@@ -14,7 +14,6 @@ import type { MembershipType, Sport, Team } from '@/types/database';
 type TeamForm = {
   name: string;
   sport_id: string;
-  season: string;
   description: string;
   contact: string;
   status: string;
@@ -24,7 +23,6 @@ type TeamForm = {
 const emptyForm: TeamForm = {
   name: '',
   sport_id: '',
-  season: '',
   description: '',
   contact: '',
   status: 'active',
@@ -90,7 +88,6 @@ export function TeamsPage() {
     setForm({
       name: team.name,
       sport_id: team.sport_id,
-      season: team.season ?? '',
       description: team.description ?? '',
       contact: team.contact ?? '',
       status: team.status,
@@ -106,7 +103,7 @@ export function TeamsPage() {
       organisation_id: activeOrg.id,
       name: form.name.trim(),
       sport_id: form.sport_id,
-      season: form.season.trim() || null,
+      season: sports.find((s) => s.id === form.sport_id)?.season || null,
       description: form.description.trim() || null,
       contact: form.contact.trim() || null,
       status: form.status,
@@ -198,7 +195,7 @@ export function TeamsPage() {
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-slate-900">{t.name}</h3>
-                      <p className="text-xs text-slate-500">{t.sports?.name || 'Sport'}{t.season ? ` · ${t.season}` : ''}</p>
+                      <p className="text-xs text-slate-500">{t.sports?.name || 'Sport'}{t.sports?.season ? ` · ${t.sports.season}` : t.season ? ` · ${t.season}` : ''}</p>
                     </div>
                   </div>
                   <StatusBadge status={t.status} />
@@ -253,13 +250,10 @@ export function TeamsPage() {
           <FormField label="Sport" required>
             <Select value={form.sport_id} onChange={(e) => setForm({ ...form, sport_id: e.target.value })}>
               <option value="">Select sport</option>
-              {sports.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {sports.map((s) => <option key={s.id} value={s.id}>{s.name}{s.season ? ` · ${s.season}` : ''}</option>)}
             </Select>
           </FormField>
 
-          <FormField label="Season">
-            <TextInput value={form.season} onChange={(e) => setForm({ ...form, season: e.target.value })} placeholder="2026/27" />
-          </FormField>
 
           <FormField label="Team subscription" required helpText="Defaults to the organisation setting for new teams, but can be changed here." className="md:col-span-2">
             <Select value={form.membership_type_id} onChange={(e) => setForm({ ...form, membership_type_id: e.target.value })}>

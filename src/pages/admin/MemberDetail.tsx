@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLoader, TableSkeleton } from '@/components/ui/SkeletonLoader';
 import { hasPermission } from '@/lib/permissions';
 import { formatDate, fullName } from '@/lib/utils';
-import { ArrowLeft, ShieldAlert, Activity, Phone, Users, Plus, Trash2, Award, Pencil } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Activity, Phone, Users, Plus, Trash2, Award, Pencil, UserRound } from 'lucide-react';
 import type { Member, MemberEmergencyContact, MemberGuardian, MemberMedicalInfo, MemberActivity } from '@/types/database';
 import { Select } from '@/components/ui/FormField';
 import { MemberEditModal } from '@/pages/admin/MemberEditModal';
@@ -99,7 +99,7 @@ export function MemberDetail() {
       <PageHeader
         title={fullName(member.first_name, member.last_name, member.preferred_name)}
         description={`${member.member_number} · ${member.email ?? 'No email'}`}
-        actions={<div className="flex items-center gap-2">{canEdit && <button type="button" className="btn-primary" onClick={()=>setEditOpen(true)}><Pencil className="h-4 w-4"/> Edit Member</button>}<StatusBadge status={member.status} /></div>}
+        actions={<div className="flex items-center gap-3"><div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">{member.photo_url ? <img src={member.photo_url} alt={`${fullName(member.first_name, member.last_name, member.preferred_name)} profile`} className="h-full w-full object-cover" /> : <UserRound className="h-7 w-7 text-slate-300" />}</div>{canEdit && <button type="button" className="btn-primary" onClick={()=>setEditOpen(true)}><Pencil className="h-4 w-4"/> Edit Member</button>}<StatusBadge status={member.status} /></div>}
       />
 
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />

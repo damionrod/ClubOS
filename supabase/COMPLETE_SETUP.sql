@@ -990,12 +990,15 @@ CREATE TABLE IF NOT EXISTS sports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organisation_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
   name text NOT NULL,
+  season text,
   description text,
   status text NOT NULL DEFAULT 'active',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(organisation_id, name)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS sports_org_name_season_unique
+  ON sports (organisation_id, lower(name), coalesce(lower(season), ''));
 
 ALTER TABLE sports ENABLE ROW LEVEL SECURITY;
 

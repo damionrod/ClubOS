@@ -13,6 +13,7 @@ import { MembershipTypes } from '@/pages/admin/MembershipTypes';
 import { Applications } from '@/pages/admin/Applications';
 import { CustomFields } from '@/pages/admin/CustomFields';
 import { TeamsPage } from '@/pages/admin/TeamsPage';
+import { SportsPage } from '@/pages/admin/SportsPage';
 import { AddMember } from '@/pages/admin/AddMember';
 import { MemberImport } from '@/pages/admin/MemberImport';
 import { RolesStructure } from '@/pages/admin/RolesStructure';
@@ -95,7 +96,7 @@ function AppRoutes() {
       <Route path="/admin/membership-types" element={<ProtectedRoute><PermissionLoader><AdminRoute><MembershipTypes /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/custom-fields" element={<ProtectedRoute><PermissionLoader><AdminRoute><CustomFields /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/teams" element={<ProtectedRoute><PermissionLoader><AdminRoute><TeamsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/sports" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="sports" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/sports" element={<ProtectedRoute><PermissionLoader><AdminRoute><SportsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/finance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="finance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/finance/transactions" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="transactions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/finance/fees" element={<ProtectedRoute><PermissionLoader><AdminRoute><PaymentFeeSettings /></AdminRoute></PermissionLoader></ProtectedRoute>} />
