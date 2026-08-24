@@ -329,65 +329,6 @@ function TeamsTab({ memberId }: { memberId: string }) {
     {canManage && <div className="card p-4"><h3 className="text-sm font-semibold">Assign team & season subscription</h3><p className="mt-1 text-xs text-slate-500">A member can have a different subscription next season. Previous seasons remain listed below.</p><div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]"><Select value={selectedTeamId} onChange={e=>setSelectedTeamId(e.target.value)}><option value="">Select an active team</option>{options.map(t=><option key={t.id} value={t.id}>{t.name}{t.season?` · ${t.season}`:''}</option>)}</Select><Select value={selectedSubscriptionId} onChange={e=>setSelectedSubscriptionId(e.target.value)} disabled={!selectedTeamId}><option value="">Select subscription</option>{subscriptions.map(s=><option key={s.id} value={s.id}>{s.name} · {Number(s.fee).toFixed(2)}</option>)}</Select><button type="button" onClick={addTeam} disabled={!selectedTeamId} className="btn-primary whitespace-nowrap"><Plus className="h-4 w-4"/>Save</button></div>{message&&<p className="mt-2 text-xs text-slate-600">{message}</p>}</div>}
     {teams.length === 0 ? <EmptyState icon={<Users className="h-6 w-6" />} title="Not in any teams" description={canManage?'Use the selector above to assign a team.':'No team assignment has been recorded.'} /> : <div className="space-y-3">{teams.map((t) => <div key={t.id} className="card flex items-center justify-between gap-3 p-4"><div><p className="text-sm font-semibold text-slate-900">{t.teams?.name}</p><p className="text-xs text-slate-500">{t.season || t.teams?.season || 'Current'} · {t.role}</p><p className="mt-1 text-xs font-medium text-primary-700">{t.subscription_types?.name||'No subscription'}{t.subscription_fee!=null?` · ${Number(t.subscription_fee).toFixed(2)}`:''}</p></div>{canManage && <button type="button" onClick={()=>removeTeam(t.id)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5"/>Remove</button>}</div>)}</div>}
   </div>;
-}: { memberId: string }) {
-  const { activeOrg } = useAuth();
-  const [teams, setTeams] = useState<any[]>([]);
-  const [options, setOptions] = useState<any[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState('');
-  const [message, setMessage] = useState('');
-  const canManage = hasPermission('teams.manage') || hasPermission('members.edit');
-
-  async function load() {
-    if (!activeOrg) return;
-    const [{ data: memberships }, { data: teamOptions }] = await Promise.all([
-      supabase.from('team_members').select('*, teams(id,name,season,sport_id)').eq('member_id', memberId).order('created_at'),
-      supabase.from('teams').select('id,name,season,status').eq('organisation_id', activeOrg.id).eq('status','active').eq('is_archived',false).order('name'),
-    ]);
-    setTeams(memberships ?? []);
-    setOptions(teamOptions ?? []);
-  }
-
-  useEffect(() => { load(); }, [memberId, activeOrg?.id]);
-
-  async function addTeam() {
-    if (!activeOrg || !selectedTeamId || !canManage) return;
-    setMessage('');
-    const team = options.find(t => t.id === selectedTeamId);
-    const exists = teams.some(t => t.team_id === selectedTeamId);
-    if (exists) return setMessage('This member is already assigned to that team.');
-    const { error } = await supabase.from('team_members').insert({
-      organisation_id: activeOrg.id,
-      team_id: selectedTeamId,
-      member_id: memberId,
-      season: team?.season || null,
-      role: 'player',
-    });
-    if (error) return setMessage(error.message);
-    setSelectedTeamId('');
-    setMessage('Team assigned.');
-    await load();
-  }
-
-  async function removeTeam(id: string) {
-    if (!canManage || !confirm('Remove this member from the team?')) return;
-    const { error } = await supabase.from('team_members').delete().eq('id', id).eq('member_id', memberId);
-    if (error) return setMessage(error.message);
-    setMessage('Team assignment removed.');
-    await load();
-  }
-
-  return (
-    <div className="space-y-4">
-      {canManage && <div className="card p-4"><h3 className="text-sm font-semibold">Assign team</h3><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Select value={selectedTeamId} onChange={e=>setSelectedTeamId(e.target.value)}><option value="">Select an active team</option>{options.map(t=><option key={t.id} value={t.id}>{t.name}{t.season?` · ${t.season}`:''}</option>)}</Select><button type="button" onClick={addTeam} disabled={!selectedTeamId} className="btn-primary whitespace-nowrap"><Plus className="h-4 w-4"/>Add to team</button></div>{message&&<p className="mt-2 text-xs text-slate-600">{message}</p>}</div>}
-      {teams.length === 0 ? <EmptyState icon={<Users className="h-6 w-6" />} title="Not in any teams" description={canManage?'Use the selector above to assign a team.':'No team assignment has been recorded.'} /> : <div className="space-y-3">{teams.map((t) => (
-        <div key={t.id} className="card flex items-center justify-between gap-3 p-4">
-          <div><p className="text-sm font-semibold text-slate-900">{t.teams?.name}</p><p className="text-xs text-slate-500">{t.season || t.teams?.season || 'Current'} · {t.role}</p></div>
-          {canManage && <button type="button" onClick={()=>removeTeam(t.id)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5"/>Remove</button>}
-        </div>
-      ))}</div>}
-    </div>
-  );
-}
 
 
 function AwardsTab({ awards }: { awards: any[] }) {
