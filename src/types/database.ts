@@ -196,6 +196,8 @@ export interface Member {
   member_since: string | null;
   paid_until: string | null;
   voting_eligible: boolean;
+  is_committee_member?: boolean;
+  committee_position_id?: string | null;
   is_archived: boolean;
   created_at: string;
   updated_at: string;

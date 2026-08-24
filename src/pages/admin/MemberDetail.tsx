@@ -25,7 +25,7 @@ export function MemberDetail() {
   const [activity, setActivity] = useState<MemberActivity[]>([]);
   const [awards, setAwards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('profile');
   const [editOpen, setEditOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const canEdit = hasPermission('members.edit');
@@ -35,7 +35,7 @@ export function MemberDetail() {
     async function load() {
       const { data: m } = await supabase
         .from('members')
-        .select('*, memberships(membership_types(*))')
+        .select('*, memberships(membership_types(*)), committee_positions(name)')
         .eq('id', id!)
         .maybeSingle();
       setMember(m as unknown as Member);
@@ -78,16 +78,9 @@ export function MemberDetail() {
   }
 
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'personal', label: 'Personal Details' },
-    { id: 'contact', label: 'Contact' },
-    { id: 'emergency', label: 'Emergency Contacts', visible: hasPermission('members.emergency.view') },
-    { id: 'guardians', label: 'Guardians', visible: hasPermission('members.guardians.view') || guardians.length > 0 },
-    { id: 'medical', label: 'Medical & Safety', visible: hasPermission('members.medical.view') },
-    { id: 'membership', label: 'Membership' },
+    { id: 'profile', label: 'Profile' },
     { id: 'teams', label: 'Teams' },
-    { id: 'awards', label: `Awards (${awards.length})` },
-    { id: 'activity', label: 'Activity' },
+    { id: 'history', label: `History (${awards.length + activity.length})` },
   ];
 
   return (
@@ -109,16 +102,28 @@ export function MemberDetail() {
       {canEdit && <MemberEditModal member={member} open={editOpen} onClose={()=>setEditOpen(false)} onSaved={(updated)=>{setMember(updated);setReloadKey((v)=>v+1);}} />}
 
       <div className="mt-4">
-        {activeTab === 'overview' && <OverviewTab member={member} />}
-        {activeTab === 'personal' && <PersonalTab member={member} />}
-        {activeTab === 'contact' && <ContactTab member={member} />}
-        {activeTab === 'emergency' && <EmergencyTab contacts={emergencyContacts} />}
-        {activeTab === 'guardians' && <GuardiansTab guardians={guardians} />}
-        {activeTab === 'medical' && <MedicalTab medical={medical} />}
-        {activeTab === 'membership' && <MembershipTab member={member} />}
+        {activeTab === 'profile' && (
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <OverviewTab member={member} />
+              <PersonalTab member={member} />
+            </div>
+            <ContactTab member={member} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <EmergencyTab contacts={emergencyContacts} />
+              {hasPermission('members.medical.view') ? <MedicalTab medical={medical} /> : null}
+            </div>
+            <CommitteeTab member={member as any} />
+            {guardians.length > 0 && <GuardiansTab guardians={guardians} />}
+          </div>
+        )}
         {activeTab === 'teams' && <TeamsTab memberId={member.id} />}
-        {activeTab === 'awards' && <AwardsTab awards={awards} />}
-        {activeTab === 'activity' && <ActivityTab activity={activity} />}
+        {activeTab === 'history' && (
+          <div className="space-y-4">
+            <AwardsTab awards={awards} />
+            <ActivityTab activity={activity} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -144,7 +149,6 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 function OverviewTab({ member }: { member: Member }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
       <InfoCard title="Membership">
         <InfoRow label="Member Number" value={<span className="font-mono text-xs">{member.member_number}</span>} />
         <InfoRow label="Status" value={<StatusBadge status={member.status} />} />
@@ -159,13 +163,11 @@ function OverviewTab({ member }: { member: Member }) {
         <InfoRow label="City" value={member.city} />
         <InfoRow label="Country" value={member.country} />
       </InfoCard>
-    </div>
   );
 }
 
 function PersonalTab({ member }: { member: Member }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
       <InfoCard title="Personal Details">
         <InfoRow label="Title" value={member.title} />
         <InfoRow label="First Name" value={member.first_name} />
@@ -176,7 +178,6 @@ function PersonalTab({ member }: { member: Member }) {
         <InfoRow label="Gender" value={member.gender} />
         <InfoRow label="Occupation" value={member.occupation} />
       </InfoCard>
-    </div>
   );
 }
 
@@ -198,6 +199,17 @@ function ContactTab({ member }: { member: Member }) {
         <InfoRow label="Alternative Phone" value={member.alternative_phone} />
       </InfoCard>
     </div>
+  );
+}
+
+function CommitteeTab({ member }: { member: any }) {
+  const position = member.committee_positions?.name ?? 'Not Applicable';
+  return (
+    <InfoCard title="Committee">
+      <InfoRow label="Committee Member" value={member.is_committee_member ? 'Yes' : 'No'} />
+      <InfoRow label="Role / Position" value={member.is_committee_member ? position : 'Not Applicable'} />
+      <p className="pt-2 text-xs text-slate-500">Committee-only motions are available only when Committee Member is set to Yes and the membership is active.</p>
+    </InfoCard>
   );
 }
 

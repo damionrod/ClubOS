@@ -46,6 +46,7 @@ export function MemberEditModal({
   const [photoPreview, setPhotoPreview] = useState('');
   const [removeExistingPhoto, setRemoveExistingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [committeePositions, setCommitteePositions] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState('');
 
@@ -75,6 +76,8 @@ export function MemberEditModal({
       member_since: member.member_since ?? '',
       paid_until: member.paid_until ?? '',
       voting_eligible: !!member.voting_eligible,
+      is_committee_member: !!(member as any).is_committee_member,
+      committee_position_id: (member as any).committee_position_id ?? '',
     });
 
     setPhoto(null);
@@ -84,6 +87,18 @@ export function MemberEditModal({
 
     let cancelled = false;
     setLoadingDetails(true);
+
+    if (activeOrg) {
+      supabase
+        .from('committee_positions')
+        .select('id,name,sort_order,is_active')
+        .eq('organisation_id', activeOrg.id)
+        .eq('is_active', true)
+        .order('sort_order')
+        .then(({ data }) => {
+          if (!cancelled) setCommitteePositions(data ?? []);
+        });
+    }
 
     Promise.all([
       supabase
@@ -206,6 +221,8 @@ export function MemberEditModal({
         member_since: form.member_since || null,
         paid_until: form.paid_until || null,
         voting_eligible: !!form.voting_eligible,
+        is_committee_member: !!form.is_committee_member,
+        committee_position_id: form.is_committee_member && form.committee_position_id ? form.committee_position_id : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -439,6 +456,39 @@ export function MemberEditModal({
             <div className="md:col-span-2">
               <FormField label="Emergency notes"><TextArea value={medical.emergency_notes} onChange={(e) => setMedical((v: any) => ({ ...v, emergency_notes: e.target.value }))} /></FormField>
             </div>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="mb-1 font-semibold">Committee</h3>
+          <p className="mb-3 text-xs text-slate-500">Committee-only motions use the Committee Member setting below. The committee position is a club title and does not automatically change system access permissions.</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={!!form.is_committee_member}
+                onChange={(e) => {
+                  set('is_committee_member', e.target.checked);
+                  if (!e.target.checked) set('committee_position_id', '');
+                }}
+              />
+              <span>
+                <span className="block font-medium text-slate-900">Committee Member</span>
+                <span className="text-xs text-slate-500">Eligible for committee-only voting when membership is active.</span>
+              </span>
+            </label>
+            <FormField label="Committee role / position">
+              <Select
+                value={form.committee_position_id ?? ''}
+                disabled={!form.is_committee_member}
+                onChange={(e) => set('committee_position_id', e.target.value)}
+              >
+                <option value="">Not Applicable</option>
+                {committeePositions.map((position) => (
+                  <option key={position.id} value={position.id}>{position.name}</option>
+                ))}
+              </Select>
+            </FormField>
           </div>
         </section>
 
