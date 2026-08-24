@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, User, Calendar, CreditCard, MoreHorizontal, LogOut, ArrowLeft, Vote, Newspaper } from 'lucide-react';
+import { Home, User, Calendar, CreditCard, MoreHorizontal, LogOut, ArrowLeft, Vote, Newspaper, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ const bottomNav = [
   { label: 'Payments', icon: CreditCard, path: '/member/payments' },
   { label: 'Voting', icon: Vote, path: '/member/voting' },
   { label: 'News', icon: Newspaper, path: '/member/news' },
+  { label: 'Shop', icon: ShoppingBag, path: '/member/merchandise' },
   { label: 'More', icon: MoreHorizontal, path: '/member/more' },
 ];
 

@@ -1,16 +1,21 @@
-# ClubOS Compact v18
+# ClubOS Compact v19
 
-Compact browser-uploadable ClubOS repository.
+Compact browser-upload repository for ClubOS. This version keeps the project below GitHub's 100-file browser upload limit.
 
-## v18 changes
-- Sports administration simplified to Sport Name (required) + Season (optional).
-- Sports are saved as organisation records and are the source of the Sport dropdown on Teams.
-- Team season is inherited from the selected Sport record.
-- Sports used by teams cannot be deleted until those teams are reassigned/deleted.
-- Member profile photos now display on the Admin Member Register detail page.
+## v19 changes
+- Separate **Subscription Types** from Membership Types.
+- Teams now use Subscription Types and organisation default team subscription.
+- Event banner upload storage/RLS repaired.
+- Events remain editable and support multiple ticket types.
+- Admin Event cards show purchased ticket/order details and export a ticket CSV report.
+- Merchandise supports up to 2 product images stored in Supabase Storage.
+- Members can browse both merchandise images before placing an order.
 
-## Existing Supabase database
+## Existing database upgrade
 Run only:
-`supabase/UPGRADE_COMPACT_V18.sql`
+`supabase/UPGRADE_COMPACT_V19.sql`
 
-Do not run `COMPLETE_SETUP.sql` on an existing populated database.
+Do not run `COMPLETE_SETUP.sql` on an existing database.
+
+## v20 – Save confirmations
+ClubOS now includes a global notification/toast system. Core Admin, Member and Platform save/create/update/upload/delete workflows display a clear success confirmation after Supabase confirms the operation. Existing inline error handling remains in place for failed operations.

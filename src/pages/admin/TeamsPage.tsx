@@ -9,7 +9,10 @@ import { FormField, Select, TextArea, TextInput } from '@/components/ui/FormFiel
 import { formatCurrency } from '@/lib/utils';
 import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { Trophy, Plus, Users, Pencil, Trash2, Settings2 } from 'lucide-react';
-import type { MembershipType, Sport, Team } from '@/types/database';
+import type { Sport } from '@/types/database';
+
+type SubscriptionType={id:string;name:string;fee:number;billing_period:string;is_active:boolean};
+type Team=any;
 
 type TeamForm = {
   name: string;
@@ -17,7 +20,7 @@ type TeamForm = {
   description: string;
   contact: string;
   status: string;
-  membership_type_id: string;
+  subscription_type_id: string;
 };
 
 const emptyForm: TeamForm = {
@@ -26,7 +29,7 @@ const emptyForm: TeamForm = {
   description: '',
   contact: '',
   status: 'active',
-  membership_type_id: '',
+  subscription_type_id: '',
 };
 
 export function TeamsPage() {
@@ -34,7 +37,7 @@ export function TeamsPage() {
   const { currency } = useOrganisationCurrency();
   const [teams, setTeams] = useState<Team[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
-  const [subscriptions, setSubscriptions] = useState<MembershipType[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionType[]>([]);
   const [defaultSubscriptionId, setDefaultSubscriptionId] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -53,19 +56,19 @@ export function TeamsPage() {
     const [teamRes, sportRes, subRes, settingsRes] = await Promise.all([
       supabase
         .from('teams')
-        .select('*, sports(*), membership_types(*)')
+        .select('*, sports(*), subscription_types(*)')
         .eq('organisation_id', activeOrg.id)
         .eq('is_archived', false)
         .order('name'),
       supabase.from('sports').select('*').eq('organisation_id', activeOrg.id).eq('status', 'active').order('name'),
-      supabase.from('membership_types').select('*').eq('organisation_id', activeOrg.id).eq('is_active', true).order('sort_order'),
-      supabase.from('organisation_settings').select('default_team_membership_type_id').eq('organisation_id', activeOrg.id).maybeSingle(),
+      supabase.from('subscription_types').select('*').eq('organisation_id', activeOrg.id).eq('is_active', true).order('sort_order'),
+      supabase.from('organisation_settings').select('default_team_subscription_type_id').eq('organisation_id', activeOrg.id).maybeSingle(),
     ]);
 
     setTeams((teamRes.data ?? []) as unknown as Team[]);
     setSports((sportRes.data ?? []) as Sport[]);
-    setSubscriptions((subRes.data ?? []) as MembershipType[]);
-    setDefaultSubscriptionId(settingsRes.data?.default_team_membership_type_id ?? '');
+    setSubscriptions((subRes.data ?? []) as SubscriptionType[]);
+    setDefaultSubscriptionId(settingsRes.data?.default_team_subscription_type_id ?? '');
     setLoading(false);
   }
 
@@ -78,7 +81,7 @@ export function TeamsPage() {
     setForm({
       ...emptyForm,
       sport_id: sports[0]?.id ?? '',
-      membership_type_id: defaultSubscriptionId || subscriptions[0]?.id || '',
+      subscription_type_id: defaultSubscriptionId || subscriptions[0]?.id || '',
     });
     setModalOpen(true);
   }
@@ -91,7 +94,7 @@ export function TeamsPage() {
       description: team.description ?? '',
       contact: team.contact ?? '',
       status: team.status,
-      membership_type_id: team.membership_type_id ?? '',
+      subscription_type_id: team.subscription_type_id ?? '',
     });
     setModalOpen(true);
   }
@@ -107,7 +110,7 @@ export function TeamsPage() {
       description: form.description.trim() || null,
       contact: form.contact.trim() || null,
       status: form.status,
-      membership_type_id: form.membership_type_id || null,
+      subscription_type_id: form.subscription_type_id || null,
       is_archived: false,
     };
 
@@ -137,7 +140,7 @@ export function TeamsPage() {
     setDefaultSubscriptionId(value);
     const { error } = await supabase
       .from('organisation_settings')
-      .update({ default_team_membership_type_id: value || null })
+      .update({ default_team_subscription_type_id: value || null })
       .eq('organisation_id', activeOrg.id);
     if (error) {
       alert(error.message);
@@ -168,7 +171,7 @@ export function TeamsPage() {
             <Select value={defaultSubscriptionId} onChange={(e) => updateDefaultSubscription(e.target.value)}>
               <option value="">No default subscription</option>
               {subscriptions.map((s) => (
-                <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.annual_fee, currency)}</option>
+                <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.fee, currency)}</option>
               ))}
             </Select>
             {defaultSubscription && <p className="mt-1 text-xs text-slate-500">Current default: {defaultSubscription.name}</p>}
@@ -185,7 +188,7 @@ export function TeamsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {teams.map((t) => {
-            const subscription = t.membership_types;
+            const subscription = t.subscription_types;
             return (
               <div key={t.id} className="card-hover p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -208,7 +211,7 @@ export function TeamsPage() {
                   {subscription ? (
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold text-slate-900">{subscription.name}</span>
-                      <span className="text-sm font-semibold text-primary-700">{formatCurrency(subscription.annual_fee, currency)}</span>
+                      <span className="text-sm font-semibold text-primary-700">{formatCurrency(subscription.fee, currency)}</span>
                     </div>
                   ) : (
                     <p className="mt-1 text-sm text-amber-700">No subscription assigned</p>
@@ -256,10 +259,10 @@ export function TeamsPage() {
 
 
           <FormField label="Team subscription" required helpText="Defaults to the organisation setting for new teams, but can be changed here." className="md:col-span-2">
-            <Select value={form.membership_type_id} onChange={(e) => setForm({ ...form, membership_type_id: e.target.value })}>
+            <Select value={form.subscription_type_id} onChange={(e) => setForm({ ...form, subscription_type_id: e.target.value })}>
               <option value="">No subscription</option>
               {subscriptions.map((s) => (
-                <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.annual_fee, currency)} / {s.duration_months} months</option>
+                <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.fee, currency)} / {s.billing_period.replace('_',' ')}</option>
               ))}
             </Select>
           </FormField>

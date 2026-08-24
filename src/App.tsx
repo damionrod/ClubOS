@@ -10,6 +10,7 @@ import { AdminDashboard } from '@/pages/admin/AdminDashboard';
 import { MemberRegister } from '@/pages/admin/MemberRegister';
 import { MemberDetail } from '@/pages/admin/MemberDetail';
 import { MembershipTypes } from '@/pages/admin/MembershipTypes';
+import { SubscriptionTypes } from '@/pages/admin/SubscriptionTypes';
 import { Applications } from '@/pages/admin/Applications';
 import { CustomFields } from '@/pages/admin/CustomFields';
 import { TeamsPage } from '@/pages/admin/TeamsPage';
@@ -22,6 +23,7 @@ import { IncomeByCategoryReport } from '@/pages/admin/IncomeByCategoryReport';
 import { BrandingSettings } from '@/pages/admin/BrandingSettings';
 import { OrganisationSettings } from '@/pages/admin/OrganisationSettings';
 import { EventsPage } from '@/pages/admin/EventsPage';
+import { MerchandisePage } from '@/pages/admin/MerchandisePage';
 import { EventCheckin } from '@/pages/admin/EventCheckin';
 import { MemberEvents } from '@/pages/member/MemberEvents';
 import { MemberDashboard } from '@/pages/member/MemberDashboard';
@@ -36,8 +38,10 @@ import { MemberVoting } from '@/pages/member/MemberVoting';
 import { MotionsPage } from '@/pages/admin/MotionsPage';
 import { AwardsRecognition } from '@/pages/admin/AwardsRecognition';
 import { MemberNews } from '@/pages/member/MemberNews';
+import { MemberMerchandise } from '@/pages/member/MemberMerchandise';
 import { PublicEvent } from '@/pages/public/PublicEvent';
 import type { ReactNode } from 'react';
+import { ToastHost } from '@/components/ToastHost';
 
 function ProtectedRoute({ children, requirePlatformAdmin = false }: { children: ReactNode; requirePlatformAdmin?: boolean }) {
   const { user, profile, loading } = useAuth();
@@ -81,6 +85,8 @@ function AdminRoute({ children }: { children: ReactNode }) {
 
 function AppRoutes() {
   return (
+    <>
+    <ToastHost />
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
@@ -93,6 +99,7 @@ function AppRoutes() {
       <Route path="/admin/members/new" element={<ProtectedRoute><PermissionLoader><AdminRoute><AddMember /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/members/import" element={<ProtectedRoute><PermissionLoader><AdminRoute><MemberImport /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/applications" element={<ProtectedRoute><PermissionLoader><AdminRoute><Applications /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/subscription-types" element={<ProtectedRoute><PermissionLoader><AdminRoute><SubscriptionTypes /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/membership-types" element={<ProtectedRoute><PermissionLoader><AdminRoute><MembershipTypes /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/custom-fields" element={<ProtectedRoute><PermissionLoader><AdminRoute><CustomFields /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/teams" element={<ProtectedRoute><PermissionLoader><AdminRoute><TeamsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
@@ -111,7 +118,7 @@ function AppRoutes() {
       <Route path="/admin/governance/motions" element={<ProtectedRoute><PermissionLoader><AdminRoute><MotionsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/governance/awards" element={<ProtectedRoute><PermissionLoader><AdminRoute><AwardsRecognition /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/documents" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="documents" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/merchandise" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="merchandise" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/merchandise" element={<ProtectedRoute><PermissionLoader><AdminRoute><MerchandisePage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/donations" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="donations" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/contacts" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="contacts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/contracts" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="contracts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
@@ -134,6 +141,7 @@ function AppRoutes() {
       <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><EditableMemberProfile /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/voting" element={<ProtectedRoute><MemberLayout><MemberVoting /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/news" element={<ProtectedRoute><MemberLayout><MemberNews /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/merchandise" element={<ProtectedRoute><MemberLayout><MemberMerchandise /></MemberLayout></ProtectedRoute>} />
 
       {/* Platform Admin Portal */}
       <Route path="/platform-admin" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDashboard /></PlatformLayout></ProtectedRoute>} />
@@ -154,6 +162,7 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+    </>
   );
 }
 

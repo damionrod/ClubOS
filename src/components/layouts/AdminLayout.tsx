@@ -38,6 +38,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
           { label: 'Member Register', path: '/admin/members' },
           { label: 'Applications', path: '/admin/applications' },
           { label: 'Membership Types', path: '/admin/membership-types' },
+          { label: 'Subscriptions', path: '/admin/subscription-types' },
           { label: 'Custom Fields', path: '/admin/custom-fields' },
         ],
       },
