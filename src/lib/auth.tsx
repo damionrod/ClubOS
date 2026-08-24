@@ -189,11 +189,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
-  async function signUp(email: string, password: string, firstName: string, lastName: string, organisationId?: string, teamId?: string, subscriptionTypeId?: string) {
+  async function signUp(email: string, password: string, firstName: string, lastName: string, organisationId?: string) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { first_name: firstName, last_name: lastName, organisation_id: organisationId || null, team_id: teamId || null, subscription_type_id: subscriptionTypeId || null } },
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          organisation_id: organisationId || null,
+        },
+      },
     });
     return { error: error?.message ?? null };
   }
