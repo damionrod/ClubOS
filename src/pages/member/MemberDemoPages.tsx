@@ -32,22 +32,39 @@ export function MemberMore(){
     window.open(data.signedUrl,'_blank','noopener,noreferrer');
   }
 
+  const links=[
+    [User,'My Profile','Personal details, photo and contacts','/member/profile'],
+    [Users,'Membership','Membership and team information','/member/membership'],
+    [CreditCard,'Payments','Fees, subscriptions and receipts','/member/payments'],
+    [ShoppingBag,'Shop','Browse club merchandise','/member/merchandise'],
+    [HeartPulse,'Donate','Make a donation to the club','/member/donations'],
+  ];
+
   return <div className="space-y-5">
-    <div><h1 className="text-2xl font-bold">More</h1><p className="text-sm text-slate-500">Documents, feedback, teams and notification preferences.</p></div>
-    <div className="grid gap-3 sm:grid-cols-2">
-      {[
-        [User,'My Profile','View and update personal details','/member/profile'],
-        [FileText,'Club Documents','Constitution, policies, minutes and club records','#documents'],
-        [Users,'My Team','View your current team and season','/member/membership'],
-        [Bell,'Notifications','Email notifications enabled','#'],
-        [CreditCard,'Receipts','View payment history','/member/payments'],
-        [ShoppingBag,'Club Merchandise','View products and product images','/member/merchandise'],
-        [Shield,'Member Feedback','Send a message to the committee','#']
-      ].map(([Icon,title,desc,href]:any)=><a href={href} key={title} className="rounded-xl border border-slate-200 bg-white p-5 hover:border-primary-300"><Icon className="h-5 w-5 text-primary-600"/><p className="mt-3 font-semibold">{title}</p><p className="mt-1 text-sm text-slate-500">{desc}</p></a>)}
+    <div><h1 className="text-2xl font-bold text-slate-900">More</h1><p className="mt-1 text-sm text-slate-500">Your account and other club services.</p></div>
+
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {links.map(([Icon,title,desc,href]:any)=>
+        <a href={href} key={title} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-primary-300">
+          <Icon className="h-5 w-5 text-primary-600"/>
+          <p className="mt-2 text-sm font-semibold text-slate-900">{title}</p>
+          <p className="mt-1 text-xs text-slate-500">{desc}</p>
+        </a>
+      )}
     </div>
-    <div id="documents"><Card title="Club Documents">
-      {loadingDocs?<p className="text-sm text-slate-500">Loading documents…</p>:documents.length===0?<p className="text-sm text-slate-500">No member documents are currently available.</p>:
-      <div className="space-y-2">{documents.map((d:any)=><button key={d.id} disabled={!d.file_path} onClick={()=>openDocument(d)} className="flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left text-sm hover:bg-slate-50 disabled:opacity-60"><span><span className="block font-medium">{d.title}</span><span className="text-xs text-slate-500">{d.category||'Document'}{d.version?` · ${d.version}`:''}{d.file_name?` · ${d.file_name}`:''}</span></span><Download className="h-4 w-4"/></button>)}</div>}
-    </Card></div>
+
+    <div id="documents" className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary-600"/><h2 className="font-semibold text-slate-900">Club Documents</h2></div>
+      <div className="mt-3">
+        {loadingDocs?<p className="text-sm text-slate-500">Loading documents…</p>:documents.length===0?
+          <p className="text-sm text-slate-500">No member documents are currently available.</p>:
+          <div className="divide-y divide-slate-100">{documents.map((d:any)=>
+            <button key={d.id} disabled={!d.file_path} onClick={()=>openDocument(d)} className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm hover:text-primary-700 disabled:opacity-60">
+              <span className="min-w-0"><span className="block truncate font-medium">{d.title}</span><span className="block truncate text-xs text-slate-500">{d.category||'Document'}{d.version?` · ${d.version}`:''}</span></span>
+              <Download className="h-4 w-4 shrink-0"/>
+            </button>
+          )}</div>}
+      </div>
+    </div>
   </div>;
 }

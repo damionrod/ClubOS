@@ -1,22 +1,203 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowRight, Calendar, CreditCard, Heart, Newspaper, ShoppingBag,
+  User, Users, Vote
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { CreditCard, User, Calendar, Vote, ShoppingBag, Award, Heart, ArrowRight, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { usePendingVotes } from '@/hooks/usePendingVotes';
+import { useUnreadUpdates } from '@/hooks/useUnreadUpdates';
 import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { formatCurrency } from '@/lib/utils';
 import type { Member } from '@/types/database';
 
-export function MemberDashboard(){
- const {profile,activeOrg}=useAuth();const {currency}=useOrganisationCurrency();const [member,setMember]=useState<Member|null>(null);const [loading,setLoading]=useState(true);const [news,setNews]=useState<any[]>([]);const [pendingAmount,setPendingAmount]=useState(0);const [pendingCount,setPendingCount]=useState(0);const [teamRows,setTeamRows]=useState<any[]>([]);const [teamChargeStatus,setTeamChargeStatus]=useState<Record<string,{status:string;amount:number}>>({});const {count:pendingVotes}=usePendingVotes(activeOrg?.id);
- useEffect(()=>{if(!profile||!activeOrg)return;(async()=>{const {data}=await supabase.from('members').select('*, memberships(membership_types(*))').eq('organisation_id',activeOrg.id).eq('user_id',profile.id).maybeSingle();setMember(data as unknown as Member);if(data?.id){const [{data:charges},{data:donations},{data:teams}]=await Promise.all([supabase.from('member_subscription_charges').select('team_member_id,amount,status').eq('organisation_id',activeOrg.id).eq('member_id',data.id),supabase.from('donations').select('amount,status').eq('organisation_id',activeOrg.id).eq('member_id',data.id).eq('status','pending'),supabase.from('team_members').select('id,season,subscription_fee,teams(name,sports(name)),subscription_types(name)').eq('member_id',data.id).eq('role','player').order('created_at',{ascending:false}).limit(8)]);const pendingCharges=(charges??[]).filter((x:any)=>['pending','unpaid'].includes(x.status));const pending=[...pendingCharges,...(donations??[])];setPendingAmount(pending.reduce((n:any,x:any)=>n+Number(x.amount||0),0));setPendingCount(pending.length);const chargeMap:Record<string,{status:string;amount:number}>={};for(const c of charges??[])if(c.team_member_id)chargeMap[c.team_member_id]={status:c.status,amount:Number(c.amount||0)};setTeamChargeStatus(chargeMap);setTeamRows(teams??[])}setLoading(false)})()},[profile?.id,activeOrg?.id]);
- useEffect(()=>{if(!activeOrg)return;supabase.from('member_awards').select('id,awarded_on,citation,award_types(name),members(first_name,last_name,preferred_name)').eq('organisation_id',activeOrg.id).eq('visibility','members').order('awarded_on',{ascending:false}).limit(3).then(({data})=>setNews(data??[]))},[activeOrg?.id]);
- if(loading)return <div className="space-y-4">{[1,2,3].map(i=><div key={i} className="card h-32 animate-pulse"/>)}</div>;
- if(!member)return <div className="card"><EmptyState icon={<User className="h-6 w-6"/>} title="No membership found" description="You don't have a membership linked to this organisation yet. Contact your club administrator."/></div>;
- const membershipType=(member as any).memberships?.[0]?.membership_types;
- const actions=[{label:'Pay subscriptions',desc:pendingCount?`${pendingCount} pending · ${formatCurrency(pendingAmount,currency)}`:'Nothing outstanding',icon:CreditCard,path:'/member/payments',accent:pendingCount?'text-amber-700':'text-primary-700'},{label:'Club Shop',desc:'Browse and buy merchandise',icon:ShoppingBag,path:'/member/merchandise',accent:'text-primary-700'},{label:'Make a Donation',desc:'Support the club',icon:Heart,path:'/member/donations',accent:'text-rose-600'},{label:'Events & Tickets',desc:'View events and buy tickets',icon:Calendar,path:'/member/events',accent:'text-primary-700'},{label:'Update Profile',desc:'Details, photo and team',icon:User,path:'/member/profile',accent:'text-primary-700'},{label:pendingVotes?`Vote now (${pendingVotes})`:'Voting',desc:pendingVotes?'You have a pending vote':'No pending votes',icon:Vote,path:'/member/voting',accent:pendingVotes?'text-red-600':'text-primary-700'}];
- return <div className="space-y-6"><div><h1 className="text-2xl font-bold">Welcome, {(member as any).preferred_name??member.first_name}</h1><p className="mt-1 text-sm text-slate-500">{activeOrg?.trading_name}</p></div><div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 p-6 text-white shadow-lg"><div className="flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-primary-200">Membership Card</p><p className="mt-2 text-xl font-bold">{activeOrg?.trading_name}</p></div><StatusBadge status={(member as any).status} variant={(member as any).status==='active'?'success':'warning'}/></div><div className="mt-6 grid grid-cols-2 gap-4"><div><p className="text-xs text-primary-200">Member Number</p><p className="text-sm font-semibold">{(member as any).member_number}</p></div><div><p className="text-xs text-primary-200">Membership Type</p><p className="text-sm font-semibold">{membershipType?.name??'—'}</p></div></div></div>{pendingCount>0&&<Link to="/member/payments" className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"><div><p className="font-semibold">Payment due</p><p className="text-sm">{pendingCount} outstanding item{pendingCount===1?'':'s'} · {formatCurrency(pendingAmount,currency)}</p></div><div className="flex items-center gap-2 font-semibold">Pay now <ArrowRight className="h-4 w-4"/></div></Link>}<div><h2 className="mb-3 font-semibold">What would you like to do?</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{actions.map(a=>{const Icon=a.icon;return <Link key={a.path} to={a.path} className="card-hover p-5"><Icon className={`h-6 w-6 ${a.accent}`}/><p className="mt-3 font-semibold">{a.label}</p><p className="mt-1 text-sm text-slate-500">{a.desc}</p></Link>})}</div></div><div className="grid gap-5 lg:grid-cols-2"><div className="card p-5"><div className="flex items-center gap-2"><Users className="h-5 w-5 text-primary-700"/><h2 className="font-semibold">My teams & subscriptions</h2></div><div className="mt-4 space-y-3">{teamRows.length===0?<p className="text-sm text-slate-500">No team assignments yet.</p>:teamRows.map((r:any)=>{const charge=teamChargeStatus[r.id];return <div key={r.id} className="rounded-lg border p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{r.teams?.name||'Team'}</p><p className="text-xs text-slate-500">{r.teams?.sports?.name?`${r.teams.sports.name} · `:''}{r.season||'Current season'}</p><p className="mt-1 text-sm">{r.subscription_types?.name||'No subscription selected'}</p></div><div className="text-right"><p className="text-sm font-semibold">{formatCurrency(Number(r.subscription_fee||0),currency)}</p>{charge&&<StatusBadge status={charge.status}/>}</div></div>{charge?.status==='pending'&&<Link to="/member/payments" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary-700 hover:underline">Pay subscription <ArrowRight className="h-3.5 w-3.5"/></Link>}</div>})}</div></div><div className="card p-5"><div className="flex items-center gap-2"><Award className="h-5 w-5 text-primary-700"/><h2 className="font-semibold">Latest club updates</h2></div><div className="mt-4 space-y-3">{news.length===0?<p className="text-sm text-slate-500">No recent awards or updates.</p>:news.map((n:any)=><div key={n.id} className="rounded-lg border p-3"><p className="font-medium">{n.award_types?.name}</p><p className="text-sm text-slate-600">{n.members?.preferred_name||n.members?.first_name} {n.members?.last_name}</p><p className="mt-1 text-xs text-slate-500">{n.citation}</p></div>)}</div></div></div></div>
+export function MemberDashboard() {
+  const { profile, activeOrg } = useAuth();
+  const { currency } = useOrganisationCurrency();
+  const { count: pendingVotes } = usePendingVotes(activeOrg?.id);
+  const { count: unreadUpdates } = useUnreadUpdates(activeOrg?.id, profile?.id);
+
+  const [member, setMember] = useState<Member | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [teamRows, setTeamRows] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!profile || !activeOrg) return;
+
+    (async () => {
+      const { data } = await supabase
+        .from('members')
+        .select('*, memberships(membership_types(*))')
+        .eq('organisation_id', activeOrg.id)
+        .eq('user_id', profile.id)
+        .maybeSingle();
+
+      setMember(data as unknown as Member);
+
+      if (data?.id) {
+        const [{ data: charges }, { data: donations }, { data: teams }] = await Promise.all([
+          supabase
+            .from('member_subscription_charges')
+            .select('amount,status')
+            .eq('organisation_id', activeOrg.id)
+            .eq('member_id', data.id),
+          supabase
+            .from('donations')
+            .select('amount,status')
+            .eq('organisation_id', activeOrg.id)
+            .eq('member_id', data.id)
+            .eq('status', 'pending'),
+          supabase
+            .from('team_members')
+            .select('id,season,subscription_fee,teams(name,sports(name)),subscription_types(name)')
+            .eq('member_id', data.id)
+            .eq('role', 'player')
+            .order('created_at', { ascending: false })
+            .limit(4),
+        ]);
+
+        const pendingCharges = (charges ?? []).filter((x: any) =>
+          ['pending', 'unpaid'].includes(x.status),
+        );
+        const pending = [...pendingCharges, ...(donations ?? [])];
+
+        setPendingAmount(pending.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
+        setPendingCount(pending.length);
+        setTeamRows(teams ?? []);
+      }
+
+      setLoading(false);
+    })();
+  }, [profile?.id, activeOrg?.id]);
+
+  if (loading) {
+    return <div className="space-y-4">{[1, 2].map((i) => <div key={i} className="card h-32 animate-pulse" />)}</div>;
+  }
+
+  if (!member) {
+    return (
+      <div className="card">
+        <EmptyState
+          icon={<User className="h-6 w-6" />}
+          title="No membership found"
+          description="You don't have a membership linked to this organisation yet. Contact your club administrator."
+        />
+      </div>
+    );
+  }
+
+  const membershipType = (member as any).memberships?.[0]?.membership_types;
+  const name = (member as any).preferred_name ?? member.first_name;
+
+  const quickActions = [
+    { label: 'Events', desc: 'Tickets & upcoming events', icon: Calendar, path: '/member/events' },
+    { label: 'Shop', desc: 'Club merchandise', icon: ShoppingBag, path: '/member/merchandise' },
+    { label: 'My Profile', desc: 'Update your details', icon: User, path: '/member/profile' },
+    { label: 'Donate', desc: 'Support the club', icon: Heart, path: '/member/donations' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Hi {name}</h1>
+        <p className="mt-1 text-sm text-slate-500">Here’s what needs your attention.</p>
+      </div>
+
+      {(pendingCount > 0 || pendingVotes > 0 || unreadUpdates > 0) && (
+        <div className="grid gap-2 sm:grid-cols-3">
+          {pendingCount > 0 && (
+            <Link to="/member/payments" className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
+              <CreditCard className="h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{pendingCount} payment{pendingCount === 1 ? '' : 's'} due</p>
+                <p className="text-xs">{formatCurrency(pendingAmount, currency)}</p>
+              </div>
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
+            </Link>
+          )}
+
+          {pendingVotes > 0 && (
+            <Link to="/member/voting" className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
+              <Vote className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">{pendingVotes} vote{pendingVotes === 1 ? '' : 's'} waiting</p>
+                <p className="text-xs">Tap to vote</p>
+              </div>
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
+            </Link>
+          )}
+
+          {unreadUpdates > 0 && (
+            <Link to="/member/news" className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-blue-800">
+              <Newspaper className="h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">{unreadUpdates} new update{unreadUpdates === 1 ? '' : 's'}</p>
+                <p className="text-xs">See what’s new</p>
+              </div>
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
+            </Link>
+          )}
+        </div>
+      )}
+
+      <div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 p-5 text-white shadow-md">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-primary-200">My Membership</p>
+            <p className="mt-1 text-lg font-bold">{membershipType?.name ?? 'Member'}</p>
+            <p className="mt-1 text-sm text-primary-100">#{(member as any).member_number}</p>
+          </div>
+          <StatusBadge
+            status={(member as any).status}
+            variant={(member as any).status === 'active' ? 'success' : 'warning'}
+          />
+        </div>
+        <Link to="/member/membership" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-white/90 hover:text-white">
+          View membership <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {quickActions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link key={action.path} to={action.path} className="card-hover p-4">
+              <Icon className="h-5 w-5 text-primary-700" />
+              <p className="mt-2 text-sm font-semibold text-slate-900">{action.label}</p>
+              <p className="mt-0.5 text-xs text-slate-500">{action.desc}</p>
+            </Link>
+          );
+        })}
+      </div>
+
+      {teamRows.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary-700" />
+              <h2 className="font-semibold text-slate-900">My Teams</h2>
+            </div>
+            <Link to="/member/membership" className="text-sm font-medium text-primary-700">View all</Link>
+          </div>
+          <div className="mt-3 divide-y divide-slate-100">
+            {teamRows.slice(0, 2).map((row: any) => (
+              <div key={row.id} className="py-3 first:pt-0 last:pb-0">
+                <p className="text-sm font-medium text-slate-900">{row.teams?.name || 'Team'}</p>
+                <p className="text-xs text-slate-500">
+                  {row.teams?.sports?.name ? `${row.teams.sports.name} · ` : ''}
+                  {row.season || 'Current season'}
+                  {row.subscription_types?.name ? ` · ${row.subscription_types.name}` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

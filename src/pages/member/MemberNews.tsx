@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Award, FileText, Image as ImageIcon, Newspaper, Paperclip } from 'lucide-react';
+import { Award, Newspaper, Paperclip } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatDate } from '@/lib/utils';
+import { useUnreadUpdates } from '@/hooks/useUnreadUpdates';
 
 type NewsAward = {
   id:string; awarded_on:string; citation:string|null; season:string|null;
@@ -17,7 +18,8 @@ type NewsPost = {
 };
 
 export function MemberNews(){
-  const {activeOrg}=useAuth();
+  const {activeOrg,profile}=useAuth();
+  const {markSeen}=useUnreadUpdates(activeOrg?.id,profile?.id);
   const [awards,setAwards]=useState<NewsAward[]>([]);
   const [posts,setPosts]=useState<NewsPost[]>([]);
   const [loading,setLoading]=useState(true);
@@ -47,8 +49,9 @@ export function MemberNews(){
       }));
       setPosts(signed);
       setLoading(false);
+      markSeen();
     });
-  },[activeOrg?.id]);
+  },[activeOrg?.id,profile?.id]);
 
   const combined=[
     ...posts.map(p=>({kind:'post' as const,date:p.published_at,data:p})),
