@@ -2539,3 +2539,692 @@ SET fee_payer = COALESCE(fee_payer,'organisation'),
     member_share_percent = COALESCE(member_share_percent,0),
     gross_amount = COALESCE(gross_amount,amount)
 WHERE fee_payer IS NULL OR member_share_percent IS NULL OR gross_amount IS NULL;
+
+
+-- === ClubOS v12 member profile and voting repair ===
+-- ClubOS v12: repair member self-service + governance voting reliability
+-- Safe to run on an existing ClubOS database, including databases where the
+-- original generic governance_motions table was created before the voting module.
+
+-- -----------------------------------------------------------------------------
+-- MEMBER SELF-SERVICE LINK REPAIR
+-- -----------------------------------------------------------------------------
+create or replace function ensure_my_member_link(p_org_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_email text := lower(coalesce(auth.jwt()->>'email',''));
+  v_member_id uuid;
+begin
+  if v_uid is null then raise exception 'Not authenticated'; end if;
+
+  select id into v_member_id
+  from members
+  where organisation_id=p_org_id and user_id=v_uid and is_archived=false
+  order by created_at limit 1;
+  if v_member_id is not null then return v_member_id; end if;
+
+  -- Only claim an unlinked record with exactly the same authenticated email.
+  if v_email <> '' then
+    select id into v_member_id
+    from members
+    where organisation_id=p_org_id
+      and user_id is null
+      and lower(coalesce(email,''))=v_email
+      and is_archived=false
+    order by created_at limit 1;
+
+    if v_member_id is not null then
+      update members set user_id=v_uid, updated_at=now() where id=v_member_id;
+      return v_member_id;
+    end if;
+  end if;
+
+  return null;
+end;
+$$;
+grant execute on function ensure_my_member_link(uuid) to authenticated;
+
+-- Repair the supplied demo member when the Auth account exists.
+do $$
+declare v_uid uuid; v_org uuid;
+begin
+  select id into v_uid from auth.users where lower(email)='member@demosportsclub.example' limit 1;
+  select id into v_org from organisations where slug='demo-sports-club' limit 1;
+  if v_uid is not null and v_org is not null then
+    update members
+    set user_id=v_uid,status='active',voting_eligible=true,is_archived=false,updated_at=now()
+    where organisation_id=v_org
+      and (user_id=v_uid or lower(coalesce(email,''))='member@demosportsclub.example');
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- GOVERNANCE SCHEMA REPAIR
+-- Migration 007 originally created a simpler governance_motions table. Add all
+-- voting columns rather than relying on CREATE TABLE IF NOT EXISTS.
+-- -----------------------------------------------------------------------------
+create table if not exists governance_motions (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null references organisations(id) on delete cascade,
+  title text not null,
+  status text default 'draft'
+);
+
+alter table governance_motions add column if not exists description text;
+alter table governance_motions add column if not exists voting_audience text default 'all_eligible_members';
+alter table governance_motions add column if not exists vote_options text[] default array['yes','no','abstain'];
+alter table governance_motions add column if not exists voting_method text default 'named';
+alter table governance_motions add column if not exists majority_percent numeric(5,2) default 50.00;
+alter table governance_motions add column if not exists quorum_percent numeric(5,2) default 0.00;
+alter table governance_motions add column if not exists opens_at timestamptz default now();
+alter table governance_motions add column if not exists closes_at timestamptz;
+alter table governance_motions add column if not exists created_at timestamptz default now();
+alter table governance_motions add column if not exists updated_at timestamptz default now();
+
+-- Preserve older motion text/date data where present.
+do $$
+begin
+  if exists(select 1 from information_schema.columns where table_schema='public' and table_name='governance_motions' and column_name='motion_text') then
+    execute 'update governance_motions set description=coalesce(description,motion_text) where description is null';
+  end if;
+  if exists(select 1 from information_schema.columns where table_schema='public' and table_name='governance_motions' and column_name='meeting_date') then
+    execute 'update governance_motions set opens_at=coalesce(opens_at,meeting_date::timestamptz) where opens_at is null';
+  end if;
+end $$;
+
+update governance_motions set voting_audience='all_eligible_members' where voting_audience is null or voting_audience not in ('all_eligible_members','committee_only');
+update governance_motions set voting_method='named' where voting_method is null or voting_method not in ('named','secret');
+update governance_motions set majority_percent=50 where majority_percent is null;
+update governance_motions set quorum_percent=0 where quorum_percent is null;
+update governance_motions set opens_at=coalesce(opens_at,created_at,now()) where opens_at is null;
+update governance_motions set created_at=coalesce(created_at,now()) where created_at is null;
+update governance_motions set updated_at=coalesce(updated_at,now()) where updated_at is null;
+update governance_motions set status='draft' where status is null or status not in ('draft','open','closed','cancelled');
+update governance_motions
+set closes_at=greatest(opens_at + interval '7 days', now() + interval '1 day')
+where closes_at is null;
+
+alter table governance_motions alter column voting_audience set not null;
+alter table governance_motions alter column voting_method set not null;
+alter table governance_motions alter column majority_percent set not null;
+alter table governance_motions alter column quorum_percent set not null;
+alter table governance_motions alter column opens_at set not null;
+alter table governance_motions alter column closes_at set not null;
+alter table governance_motions alter column created_at set not null;
+alter table governance_motions alter column updated_at set not null;
+
+create index if not exists governance_motions_org_status_idx on governance_motions(organisation_id,status,closes_at);
+alter table governance_motions enable row level security;
+
+create table if not exists governance_motion_votes (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null references organisations(id) on delete cascade,
+  motion_id uuid not null references governance_motions(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  choice text not null check(choice in ('yes','no','abstain')),
+  voted_at timestamptz not null default now(),
+  unique(motion_id,user_id)
+);
+create index if not exists governance_motion_votes_motion_idx on governance_motion_votes(motion_id);
+alter table governance_motion_votes enable row level security;
+
+-- -----------------------------------------------------------------------------
+-- ELIGIBILITY / ACCESS HELPERS
+-- -----------------------------------------------------------------------------
+create or replace function is_committee_user(p_org_id uuid,p_user_id uuid default auth.uid())
+returns boolean language sql stable security definer set search_path=public as $$
+  select exists(
+    select 1 from organisation_users ou
+    left join roles r on r.id=ou.role_id
+    where ou.organisation_id=p_org_id and ou.user_id=p_user_id and ou.status='active'
+      and (
+        ou.is_owner=true
+        or lower(coalesce(r.structure_group,''))='committee'
+        or lower(coalesce(r.name,'')) in ('president','vice president','secretary','treasurer','committee member','organisation owner','club owner','chair','chairperson','committee')
+      )
+  );
+$$;
+
+create or replace function is_eligible_member_voter(p_org_id uuid,p_user_id uuid default auth.uid())
+returns boolean language sql stable security definer set search_path=public as $$
+  select exists(
+    select 1 from members m
+    where m.organisation_id=p_org_id and m.user_id=p_user_id
+      and m.status='active' and m.voting_eligible=true and m.is_archived=false
+  );
+$$;
+
+create or replace function is_org_admin_user(p_org_id uuid,p_user_id uuid default auth.uid())
+returns boolean language sql stable security definer set search_path=public as $$
+  select exists(
+    select 1 from organisation_users ou
+    left join roles r on r.id=ou.role_id
+    where ou.organisation_id=p_org_id and ou.user_id=p_user_id and ou.status='active'
+      and (ou.is_owner=true or lower(coalesce(r.name,'')) <> 'member')
+  );
+$$;
+
+create or replace function can_view_motion(p_motion_id uuid,p_user_id uuid default auth.uid())
+returns boolean language plpgsql stable security definer set search_path=public as $$
+declare m governance_motions%rowtype;
+begin
+  select * into m from governance_motions where id=p_motion_id;
+  if not found then return false; end if;
+  if is_org_admin_user(m.organisation_id,p_user_id) then return true; end if;
+  if m.voting_audience='committee_only' then return is_committee_user(m.organisation_id,p_user_id); end if;
+  return is_eligible_member_voter(m.organisation_id,p_user_id);
+end;
+$$;
+
+create or replace function can_vote_motion(p_motion_id uuid,p_user_id uuid default auth.uid())
+returns boolean language plpgsql stable security definer set search_path=public as $$
+declare m governance_motions%rowtype;
+begin
+  select * into m from governance_motions where id=p_motion_id;
+  if not found then return false; end if;
+  if m.status <> 'open' or m.opens_at>now() or m.closes_at<=now() then return false; end if;
+  if m.voting_audience='committee_only' then return is_committee_user(m.organisation_id,p_user_id); end if;
+  return is_eligible_member_voter(m.organisation_id,p_user_id);
+end;
+$$;
+
+grant execute on function is_committee_user(uuid,uuid) to authenticated;
+grant execute on function is_eligible_member_voter(uuid,uuid) to authenticated;
+grant execute on function is_org_admin_user(uuid,uuid) to authenticated;
+grant execute on function can_view_motion(uuid,uuid) to authenticated;
+grant execute on function can_vote_motion(uuid,uuid) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- RLS
+-- -----------------------------------------------------------------------------
+drop policy if exists "motions_org_admin_select" on governance_motions;
+create policy "motions_org_admin_select" on governance_motions for select to authenticated using(can_view_motion(id,auth.uid()));
+drop policy if exists "motions_org_admin_insert" on governance_motions;
+create policy "motions_org_admin_insert" on governance_motions for insert to authenticated with check(is_org_admin_user(organisation_id,auth.uid()));
+drop policy if exists "motions_org_admin_update" on governance_motions;
+create policy "motions_org_admin_update" on governance_motions for update to authenticated using(is_org_admin_user(organisation_id,auth.uid())) with check(is_org_admin_user(organisation_id,auth.uid()));
+drop policy if exists "motions_org_admin_delete" on governance_motions;
+create policy "motions_org_admin_delete" on governance_motions for delete to authenticated using(is_org_admin_user(organisation_id,auth.uid()));
+
+drop policy if exists "motion_votes_select" on governance_motion_votes;
+create policy "motion_votes_select" on governance_motion_votes for select to authenticated using(
+  user_id=auth.uid() or exists(
+    select 1 from governance_motions m
+    where m.id=motion_id and m.voting_method='named' and is_org_admin_user(m.organisation_id,auth.uid())
+  )
+);
+drop policy if exists "motion_votes_insert" on governance_motion_votes;
+create policy "motion_votes_insert" on governance_motion_votes for insert to authenticated with check(user_id=auth.uid() and can_vote_motion(motion_id,auth.uid()));
+drop policy if exists "motion_votes_update" on governance_motion_votes;
+create policy "motion_votes_update" on governance_motion_votes for update to authenticated using(user_id=auth.uid() and can_vote_motion(motion_id,auth.uid())) with check(user_id=auth.uid() and can_vote_motion(motion_id,auth.uid()));
+
+-- -----------------------------------------------------------------------------
+-- SERVER-SIDE VOTE SUBMISSION
+-- -----------------------------------------------------------------------------
+create or replace function cast_motion_vote(p_motion_id uuid,p_choice text)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_uid uuid:=auth.uid(); v_org uuid;
+begin
+  if v_uid is null then raise exception 'Not authenticated'; end if;
+  if p_choice not in ('yes','no','abstain') then raise exception 'Invalid vote choice'; end if;
+  if not can_vote_motion(p_motion_id,v_uid) then
+    raise exception 'You are not eligible to vote on this motion, or voting has closed.';
+  end if;
+  select organisation_id into v_org from governance_motions where id=p_motion_id;
+  insert into governance_motion_votes(organisation_id,motion_id,user_id,choice,voted_at)
+  values(v_org,p_motion_id,v_uid,p_choice,now())
+  on conflict(motion_id,user_id) do update set choice=excluded.choice,voted_at=now();
+end;
+$$;
+grant execute on function cast_motion_vote(uuid,text) to authenticated;
+
+-- -----------------------------------------------------------------------------
+-- MEMBER / ADMIN QUERY RPCs
+-- -----------------------------------------------------------------------------
+create or replace function get_my_voting_motions(p_org_id uuid)
+returns table(id uuid,title text,description text,voting_audience text,voting_method text,majority_percent numeric,quorum_percent numeric,opens_at timestamptz,closes_at timestamptz,status text,my_choice text,total_votes bigint,yes_votes bigint,no_votes bigint,abstain_votes bigint)
+language sql stable security definer set search_path=public as $$
+  select m.id,m.title,m.description,m.voting_audience,m.voting_method,m.majority_percent,m.quorum_percent,m.opens_at,m.closes_at,
+    case when m.status='open' and m.closes_at<=now() then 'closed' else m.status end,
+    mine.choice,count(v.id),count(v.id) filter(where v.choice='yes'),count(v.id) filter(where v.choice='no'),count(v.id) filter(where v.choice='abstain')
+  from governance_motions m
+  left join governance_motion_votes mine on mine.motion_id=m.id and mine.user_id=auth.uid()
+  left join governance_motion_votes v on v.motion_id=m.id
+  where m.organisation_id=p_org_id and m.status in ('open','closed') and m.opens_at<=now()
+    and ((m.voting_audience='all_eligible_members' and is_eligible_member_voter(m.organisation_id,auth.uid()))
+      or (m.voting_audience='committee_only' and is_committee_user(m.organisation_id,auth.uid())))
+  group by m.id,m.title,m.description,m.voting_audience,m.voting_method,m.majority_percent,m.quorum_percent,m.opens_at,m.closes_at,m.status,mine.choice
+  order by case when m.status='open' and m.closes_at>now() and mine.choice is null then 0 else 1 end,m.closes_at asc,m.opens_at desc;
+$$;
+grant execute on function get_my_voting_motions(uuid) to authenticated;
+
+create or replace function get_pending_motion_count(p_org_id uuid)
+returns integer language sql stable security definer set search_path=public as $$
+  select count(*)::integer from governance_motions m
+  where m.organisation_id=p_org_id and m.status='open' and m.opens_at<=now() and m.closes_at>now()
+    and not exists(select 1 from governance_motion_votes v where v.motion_id=m.id and v.user_id=auth.uid())
+    and ((m.voting_audience='all_eligible_members' and is_eligible_member_voter(m.organisation_id,auth.uid()))
+      or (m.voting_audience='committee_only' and is_committee_user(m.organisation_id,auth.uid())));
+$$;
+grant execute on function get_pending_motion_count(uuid) to authenticated;
+
+create or replace function get_admin_motions(p_org_id uuid)
+returns table(id uuid,title text,description text,voting_audience text,voting_method text,majority_percent numeric,quorum_percent numeric,opens_at timestamptz,closes_at timestamptz,status text,created_at timestamptz,total_votes bigint,yes_votes bigint,no_votes bigint,abstain_votes bigint)
+language sql stable security definer set search_path=public as $$
+  select m.id,m.title,m.description,m.voting_audience,m.voting_method,m.majority_percent,m.quorum_percent,m.opens_at,m.closes_at,
+    case when m.status='open' and m.closes_at<=now() then 'closed' else m.status end,m.created_at,
+    count(v.id),count(v.id) filter(where v.choice='yes'),count(v.id) filter(where v.choice='no'),count(v.id) filter(where v.choice='abstain')
+  from governance_motions m left join governance_motion_votes v on v.motion_id=m.id
+  where m.organisation_id=p_org_id and is_org_admin_user(p_org_id,auth.uid())
+  group by m.id
+  order by m.created_at desc;
+$$;
+grant execute on function get_admin_motions(uuid) to authenticated;
+
+-- Demo motions if the demo organisation exists.
+do $$
+declare v_org uuid;
+begin
+  select id into v_org from organisations where slug='demo-sports-club' limit 1;
+  if v_org is null then return; end if;
+  if not exists(select 1 from governance_motions where organisation_id=v_org and title='Approve 2026/27 Equipment Budget') then
+    insert into governance_motions(organisation_id,title,description,voting_audience,voting_method,majority_percent,quorum_percent,opens_at,closes_at,status)
+    values(v_org,'Approve 2026/27 Equipment Budget','Approve an equipment budget for the 2026/27 season.','all_eligible_members','named',50,20,now()-interval '1 hour',now()+interval '7 days','open');
+  end if;
+  if not exists(select 1 from governance_motions where organisation_id=v_org and title='Approve Catering Supplier for Awards Night') then
+    insert into governance_motions(organisation_id,title,description,voting_audience,voting_method,majority_percent,quorum_percent,opens_at,closes_at,status)
+    values(v_org,'Approve Catering Supplier for Awards Night','Committee approval of the preferred awards-night catering supplier.','committee_only','named',50,50,now()-interval '1 hour',now()+interval '3 days','open');
+  end if;
+end $$;
+
+/*
+  ClubOS v13 — member team selection at signup + self-service team editing.
+
+  Adds:
+  - public-safe RPCs used by the signup screen to list active organisations/teams
+  - signup metadata handling so a new Auth user becomes a pending member of the chosen organisation
+  - initial team assignment (and team membership subscription when configured)
+  - RLS allowing members to change only their own player-team assignment
+  - RLS preserving full team management for owners/platform admins/roles with teams.manage
+*/
+
+-- Public signup catalogues. These functions deliberately return only minimal display data.
+CREATE OR REPLACE FUNCTION get_signup_organisations()
+RETURNS TABLE(id uuid, trading_name text, country text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT o.id, o.trading_name, o.country
+  FROM organisations o
+  WHERE o.status = 'active'
+  ORDER BY o.trading_name;
+$$;
+
+CREATE OR REPLACE FUNCTION get_signup_teams(p_org_id uuid)
+RETURNS TABLE(id uuid, name text, season text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT t.id, t.name, t.season
+  FROM teams t
+  WHERE t.organisation_id = p_org_id
+    AND t.status = 'active'
+    AND COALESCE(t.is_archived, false) = false
+  ORDER BY t.name;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_signup_organisations() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION get_signup_teams(uuid) TO anon, authenticated;
+
+-- Permission helper for team administration.
+CREATE OR REPLACE FUNCTION can_manage_teams(p_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    is_platform_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM organisation_users ou
+      WHERE ou.organisation_id = p_org_id
+        AND ou.user_id = auth.uid()
+        AND ou.status = 'active'
+        AND (
+          ou.is_owner = true
+          OR EXISTS (
+            SELECT 1
+            FROM role_permissions rp
+            JOIN permissions p ON p.id = rp.permission_id
+            WHERE rp.role_id = ou.role_id
+              AND p.key = 'teams.manage'
+          )
+        )
+    );
+$$;
+
+-- Replace the overly broad team_members policy. Members can manage only their own
+-- normal player assignment; club users with teams.manage retain full management.
+DROP POLICY IF EXISTS "tm_modify" ON team_members;
+DROP POLICY IF EXISTS "tm_insert_v13" ON team_members;
+DROP POLICY IF EXISTS "tm_update_v13" ON team_members;
+DROP POLICY IF EXISTS "tm_delete_v13" ON team_members;
+
+CREATE POLICY "tm_insert_v13" ON team_members
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    can_manage_teams(organisation_id)
+    OR (
+      role = 'player'
+      AND EXISTS (
+        SELECT 1 FROM members m
+        WHERE m.id = team_members.member_id
+          AND m.user_id = auth.uid()
+          AND m.organisation_id = team_members.organisation_id
+      )
+      AND EXISTS (
+        SELECT 1 FROM teams t
+        WHERE t.id = team_members.team_id
+          AND t.organisation_id = team_members.organisation_id
+          AND t.status = 'active'
+          AND COALESCE(t.is_archived, false) = false
+      )
+    )
+  );
+
+CREATE POLICY "tm_update_v13" ON team_members
+  FOR UPDATE TO authenticated
+  USING (
+    can_manage_teams(organisation_id)
+    OR (role = 'player' AND EXISTS (
+      SELECT 1 FROM members m WHERE m.id = team_members.member_id AND m.user_id = auth.uid()
+    ))
+  )
+  WITH CHECK (
+    can_manage_teams(organisation_id)
+    OR (
+      role = 'player'
+      AND EXISTS (
+        SELECT 1 FROM members m
+        WHERE m.id = team_members.member_id
+          AND m.user_id = auth.uid()
+          AND m.organisation_id = team_members.organisation_id
+      )
+    )
+  );
+
+CREATE POLICY "tm_delete_v13" ON team_members
+  FOR DELETE TO authenticated
+  USING (
+    can_manage_teams(organisation_id)
+    OR (role = 'player' AND EXISTS (
+      SELECT 1 FROM members m WHERE m.id = team_members.member_id AND m.user_id = auth.uid()
+    ))
+  );
+
+-- Expand the existing signup trigger. If organisation_id/team_id are supplied by
+-- the ClubOS signup form, create the member link immediately. The member itself is
+-- pending so clubs can still use an approval process.
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_org_id uuid;
+  v_team_id uuid;
+  v_role_id uuid;
+  v_member_id uuid;
+  v_member_number text;
+  v_team_membership_type_id uuid;
+  v_team_season text;
+BEGIN
+  INSERT INTO profiles (id, email, first_name, last_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
+    COALESCE(NEW.raw_user_meta_data->>'last_name', '')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
+    updated_at = now();
+
+  BEGIN
+    v_org_id := NULLIF(NEW.raw_user_meta_data->>'organisation_id', '')::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_org_id := NULL;
+  END;
+
+  BEGIN
+    v_team_id := NULLIF(NEW.raw_user_meta_data->>'team_id', '')::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    v_team_id := NULL;
+  END;
+
+  IF v_org_id IS NULL OR NOT EXISTS (
+    SELECT 1 FROM organisations o WHERE o.id = v_org_id AND o.status = 'active'
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT r.id INTO v_role_id
+  FROM roles r
+  WHERE r.organisation_id = v_org_id
+    AND lower(r.name) = 'member'
+  ORDER BY r.is_default DESC, r.sort_order
+  LIMIT 1;
+
+  INSERT INTO organisation_users (organisation_id, user_id, role_id, is_owner, status)
+  VALUES (v_org_id, NEW.id, v_role_id, false, 'active')
+  ON CONFLICT (organisation_id, user_id) DO UPDATE SET
+    role_id = COALESCE(EXCLUDED.role_id, organisation_users.role_id),
+    status = 'active',
+    updated_at = now();
+
+  IF v_role_id IS NOT NULL THEN
+    INSERT INTO user_roles (organisation_id, user_id, role_id)
+    VALUES (v_org_id, NEW.id, v_role_id)
+    ON CONFLICT DO NOTHING;
+  END IF;
+
+  SELECT m.id INTO v_member_id
+  FROM members m
+  WHERE m.organisation_id = v_org_id AND m.user_id = NEW.id
+  LIMIT 1;
+
+  IF v_member_id IS NULL THEN
+    v_member_number := 'M-' || upper(substr(replace(NEW.id::text, '-', ''), 1, 10));
+    INSERT INTO members (
+      organisation_id, user_id, member_number, first_name, last_name, email,
+      status, joined_date, member_since, country
+    ) VALUES (
+      v_org_id, NEW.id, v_member_number,
+      COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
+      COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
+      NEW.email, 'pending', CURRENT_DATE, CURRENT_DATE,
+      (SELECT CASE WHEN o.country = 'NZ' THEN 'New Zealand' ELSE o.country END FROM organisations o WHERE o.id = v_org_id)
+    )
+    RETURNING id INTO v_member_id;
+  END IF;
+
+  IF v_team_id IS NOT NULL THEN
+    SELECT t.membership_type_id, t.season
+      INTO v_team_membership_type_id, v_team_season
+    FROM teams t
+    WHERE t.id = v_team_id
+      AND t.organisation_id = v_org_id
+      AND t.status = 'active'
+      AND COALESCE(t.is_archived, false) = false;
+
+    IF FOUND THEN
+      INSERT INTO team_members (organisation_id, team_id, member_id, season, role)
+      VALUES (v_org_id, v_team_id, v_member_id, v_team_season, 'player')
+      ON CONFLICT DO NOTHING;
+
+      IF v_team_membership_type_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM memberships ms WHERE ms.member_id = v_member_id AND ms.status = 'active') THEN
+        INSERT INTO memberships (organisation_id, member_id, membership_type_id, status, start_date)
+        VALUES (v_org_id, v_member_id, v_team_membership_type_id, 'active', CURRENT_DATE);
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+/*
+# Awards & Recognition
+- Configurable award types per organisation
+- Award assignment to searchable members
+- Public/member-visible or private/internal recognition
+- Member profile history and member news feed
+*/
+
+CREATE TABLE IF NOT EXISTS award_types (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organisation_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  category text NOT NULL DEFAULT 'recognition',
+  is_active boolean NOT NULL DEFAULT true,
+  sort_order int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (organisation_id, name)
+);
+ALTER TABLE award_types ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS member_awards (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organisation_id uuid NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  award_type_id uuid NOT NULL REFERENCES award_types(id) ON DELETE RESTRICT,
+  member_id uuid NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  awarded_on date NOT NULL DEFAULT CURRENT_DATE,
+  award_year int,
+  season text,
+  citation text,
+  notes text,
+  visibility text NOT NULL DEFAULT 'members' CHECK (visibility IN ('members','private')),
+  announced_at timestamptz,
+  created_by uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE member_awards ENABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_member_awards_member ON member_awards(member_id, awarded_on DESC);
+CREATE INDEX IF NOT EXISTS idx_member_awards_org_public ON member_awards(organisation_id, visibility, awarded_on DESC);
+
+CREATE OR REPLACE FUNCTION can_manage_awards(p_org_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM organisation_users ou
+    LEFT JOIN user_roles ur ON ur.organisation_id = ou.organisation_id AND ur.user_id = ou.user_id
+    LEFT JOIN roles r ON r.id = COALESCE(ur.role_id, ou.role_id)
+    LEFT JOIN role_module_access rma ON rma.role_id = r.id
+    LEFT JOIN modules m ON m.id = rma.module_id AND m.key = 'governance'
+    WHERE ou.organisation_id = p_org_id
+      AND ou.user_id = auth.uid()
+      AND ou.status = 'active'
+      AND (ou.is_owner = true OR rma.access_level = 'full_admin')
+  ) OR is_platform_admin();
+$$;
+
+DROP POLICY IF EXISTS "award_types_select" ON award_types;
+CREATE POLICY "award_types_select" ON award_types FOR SELECT TO authenticated
+  USING (user_in_org(organisation_id) OR is_platform_admin());
+DROP POLICY IF EXISTS "award_types_manage" ON award_types;
+CREATE POLICY "award_types_manage" ON award_types FOR ALL TO authenticated
+  USING (can_manage_awards(organisation_id)) WITH CHECK (can_manage_awards(organisation_id));
+
+DROP POLICY IF EXISTS "member_awards_select" ON member_awards;
+CREATE POLICY "member_awards_select" ON member_awards FOR SELECT TO authenticated
+  USING (
+    is_platform_admin()
+    OR can_manage_awards(organisation_id)
+    OR (
+      user_in_org(organisation_id)
+      AND (
+        visibility = 'members'
+        OR EXISTS (SELECT 1 FROM members mm WHERE mm.id = member_id AND mm.user_id = auth.uid())
+      )
+    )
+  );
+DROP POLICY IF EXISTS "member_awards_manage" ON member_awards;
+CREATE POLICY "member_awards_manage" ON member_awards FOR ALL TO authenticated
+  USING (can_manage_awards(organisation_id)) WITH CHECK (can_manage_awards(organisation_id));
+
+-- Catalogue permissions for organisations that prefer fine-grained permissions.
+INSERT INTO permissions (key,module_key,description,sensitivity)
+VALUES
+ ('awards.view','governance','View awards and recognition','general'),
+ ('awards.manage','governance','Create and manage award types and member awards','general')
+ON CONFLICT (key) DO NOTHING;
+
+-- Give governance full-admin roles the new permissions.
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT DISTINCT rma.role_id, p.id
+FROM role_module_access rma
+JOIN modules m ON m.id = rma.module_id AND m.key = 'governance'
+CROSS JOIN permissions p
+WHERE rma.access_level = 'full_admin' AND p.key IN ('awards.view','awards.manage')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Demo award types and awards.
+DO $$
+DECLARE
+  v_org uuid;
+  v_best_vol uuid;
+  v_best_bowler uuid;
+  v_spirit uuid;
+  v_m1 uuid;
+  v_m2 uuid;
+BEGIN
+  SELECT id INTO v_org FROM organisations WHERE slug = 'demo-sports-club' LIMIT 1;
+  IF v_org IS NULL THEN RETURN; END IF;
+
+  INSERT INTO award_types(organisation_id,name,description,category,sort_order)
+  VALUES
+   (v_org,'Volunteer of the Year','Recognises outstanding voluntary service to the club.','service',10),
+   (v_org,'Best Bowler','Recognises outstanding bowling performance for the season.','sporting',20),
+   (v_org,'Club Spirit Award','Recognises sportsmanship, leadership and positive club contribution.','recognition',30)
+  ON CONFLICT (organisation_id,name) DO UPDATE SET description=EXCLUDED.description, category=EXCLUDED.category, is_active=true;
+
+  SELECT id INTO v_best_vol FROM award_types WHERE organisation_id=v_org AND name='Volunteer of the Year';
+  SELECT id INTO v_best_bowler FROM award_types WHERE organisation_id=v_org AND name='Best Bowler';
+  SELECT id INTO v_spirit FROM award_types WHERE organisation_id=v_org AND name='Club Spirit Award';
+  SELECT id INTO v_m1 FROM members WHERE organisation_id=v_org ORDER BY member_number LIMIT 1;
+  SELECT id INTO v_m2 FROM members WHERE organisation_id=v_org ORDER BY member_number OFFSET 1 LIMIT 1;
+
+  IF v_m1 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM member_awards WHERE organisation_id=v_org AND member_id=v_m1 AND award_type_id=v_best_vol) THEN
+    INSERT INTO member_awards(organisation_id,award_type_id,member_id,awarded_on,award_year,season,citation,visibility,announced_at)
+    VALUES(v_org,v_best_vol,v_m1,CURRENT_DATE-45,EXTRACT(YEAR FROM CURRENT_DATE)::int,'2026/27','For exceptional contribution to club activities, events and member support.','members',now()-interval '45 days');
+  END IF;
+  IF v_m2 IS NOT NULL AND NOT EXISTS (SELECT 1 FROM member_awards WHERE organisation_id=v_org AND member_id=v_m2 AND award_type_id=v_best_bowler) THEN
+    INSERT INTO member_awards(organisation_id,award_type_id,member_id,awarded_on,award_year,season,citation,visibility,announced_at)
+    VALUES(v_org,v_best_bowler,v_m2,CURRENT_DATE-20,EXTRACT(YEAR FROM CURRENT_DATE)::int,'2026/27','Outstanding bowling performance and consistency throughout the season.','members',now()-interval '20 days');
+  END IF;
+END $$;

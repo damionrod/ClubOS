@@ -9,8 +9,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonLoader, TableSkeleton } from '@/components/ui/SkeletonLoader';
 import { hasPermission } from '@/lib/permissions';
 import { formatDate, fullName } from '@/lib/utils';
-import { ArrowLeft, ShieldAlert, Activity, Phone, Mail, MapPin, Heart, Users } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Activity, Phone, Mail, MapPin, Heart, Users, Plus, Trash2, Award } from 'lucide-react';
 import type { Member, MemberEmergencyContact, MemberGuardian, MemberMedicalInfo, MemberActivity } from '@/types/database';
+import { Select } from '@/components/ui/FormField';
 
 export function MemberDetail() {
   const { id } = useParams();
@@ -20,6 +21,7 @@ export function MemberDetail() {
   const [guardians, setGuardians] = useState<MemberGuardian[]>([]);
   const [medical, setMedical] = useState<MemberMedicalInfo | null>(null);
   const [activity, setActivity] = useState<MemberActivity[]>([]);
+  const [awards, setAwards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -41,6 +43,8 @@ export function MemberDetail() {
 
       const { data: a } = await supabase.from('member_activity').select('*').eq('member_id', id!).order('created_at', { ascending: false });
       setActivity(a ?? []);
+      const { data: aw } = await supabase.from('member_awards').select('id,awarded_on,season,citation,visibility,award_types(name)').eq('member_id', id!).order('awarded_on',{ascending:false});
+      setAwards(aw ?? []);
 
       if (hasPermission('members.medical.view')) {
         const { data: med } = await supabase.from('member_medical_information').select('*').eq('member_id', id!).maybeSingle();
@@ -77,6 +81,7 @@ export function MemberDetail() {
     { id: 'medical', label: 'Medical & Safety', visible: hasPermission('members.medical.view') },
     { id: 'membership', label: 'Membership' },
     { id: 'teams', label: 'Teams' },
+    { id: 'awards', label: `Awards (${awards.length})` },
     { id: 'activity', label: 'Activity' },
   ];
 
@@ -105,6 +110,7 @@ export function MemberDetail() {
         {activeTab === 'medical' && <MedicalTab medical={medical} />}
         {activeTab === 'membership' && <MembershipTab member={member} />}
         {activeTab === 'teams' && <TeamsTab memberId={member.id} />}
+        {activeTab === 'awards' && <AwardsTab awards={awards} />}
         {activeTab === 'activity' && <ActivityTab activity={activity} />}
       </div>
     </div>
@@ -270,21 +276,69 @@ function MembershipTab({ member }: { member: Member }) {
 }
 
 function TeamsTab({ memberId }: { memberId: string }) {
+  const { activeOrg } = useAuth();
   const [teams, setTeams] = useState<any[]>([]);
-  useEffect(() => {
-    supabase.from('team_members').select('*, teams(name, season, sports(name))').eq('member_id', memberId).then(({ data }) => setTeams(data ?? []));
-  }, [memberId]);
-  if (teams.length === 0) return <EmptyState icon={<Users className="h-6 w-6" />} title="Not in any teams" />;
+  const [options, setOptions] = useState<any[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState('');
+  const [message, setMessage] = useState('');
+  const canManage = hasPermission('teams.manage') || hasPermission('members.edit');
+
+  async function load() {
+    if (!activeOrg) return;
+    const [{ data: memberships }, { data: teamOptions }] = await Promise.all([
+      supabase.from('team_members').select('*, teams(name, season, sports(name))').eq('member_id', memberId).order('created_at'),
+      supabase.from('teams').select('id,name,season,status').eq('organisation_id', activeOrg.id).eq('status','active').eq('is_archived',false).order('name'),
+    ]);
+    setTeams(memberships ?? []);
+    setOptions(teamOptions ?? []);
+  }
+
+  useEffect(() => { load(); }, [memberId, activeOrg?.id]);
+
+  async function addTeam() {
+    if (!activeOrg || !selectedTeamId || !canManage) return;
+    setMessage('');
+    const team = options.find(t => t.id === selectedTeamId);
+    const exists = teams.some(t => t.team_id === selectedTeamId);
+    if (exists) return setMessage('This member is already assigned to that team.');
+    const { error } = await supabase.from('team_members').insert({
+      organisation_id: activeOrg.id,
+      team_id: selectedTeamId,
+      member_id: memberId,
+      season: team?.season || null,
+      role: 'player',
+    });
+    if (error) return setMessage(error.message);
+    setSelectedTeamId('');
+    setMessage('Team assigned.');
+    await load();
+  }
+
+  async function removeTeam(id: string) {
+    if (!canManage || !confirm('Remove this member from the team?')) return;
+    const { error } = await supabase.from('team_members').delete().eq('id', id).eq('member_id', memberId);
+    if (error) return setMessage(error.message);
+    setMessage('Team assignment removed.');
+    await load();
+  }
+
   return (
-    <div className="space-y-3">
-      {teams.map((t) => (
-        <div key={t.id} className="card p-4">
-          <p className="text-sm font-semibold text-slate-900">{t.teams?.name}</p>
-          <p className="text-xs text-slate-500">{t.teams?.sports?.name} · {t.season} · {t.role}</p>
+    <div className="space-y-4">
+      {canManage && <div className="card p-4"><h3 className="text-sm font-semibold">Assign team</h3><div className="mt-3 flex flex-col gap-2 sm:flex-row"><Select value={selectedTeamId} onChange={e=>setSelectedTeamId(e.target.value)}><option value="">Select an active team</option>{options.map(t=><option key={t.id} value={t.id}>{t.name}{t.season?` · ${t.season}`:''}</option>)}</Select><button type="button" onClick={addTeam} disabled={!selectedTeamId} className="btn-primary whitespace-nowrap"><Plus className="h-4 w-4"/>Add to team</button></div>{message&&<p className="mt-2 text-xs text-slate-600">{message}</p>}</div>}
+      {teams.length === 0 ? <EmptyState icon={<Users className="h-6 w-6" />} title="Not in any teams" description={canManage?'Use the selector above to assign a team.':'No team assignment has been recorded.'} /> : <div className="space-y-3">{teams.map((t) => (
+        <div key={t.id} className="card flex items-center justify-between gap-3 p-4">
+          <div><p className="text-sm font-semibold text-slate-900">{t.teams?.name}</p><p className="text-xs text-slate-500">{t.teams?.sports?.name} · {t.season || t.teams?.season || 'Current'} · {t.role}</p></div>
+          {canManage && <button type="button" onClick={()=>removeTeam(t.id)} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5"/>Remove</button>}
         </div>
-      ))}
+      ))}</div>}
     </div>
   );
+}
+
+
+function AwardsTab({ awards }: { awards: any[] }) {
+  if (awards.length === 0) return <EmptyState icon={<Award className="h-6 w-6" />} title="No awards recorded" description="Awards assigned through Governance → Awards & Recognition will appear here." />;
+  return <div className="space-y-3">{awards.map((a:any)=><div key={a.id} className="card flex gap-3 p-4"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-700"><Award className="h-5 w-5"/></div><div><p className="font-semibold text-slate-900">{a.award_types?.name}</p><p className="text-xs text-slate-500">{formatDate(a.awarded_on)}{a.season?` · ${a.season}`:''} · {a.visibility==='members'?'Member-visible':'Private'}</p>{a.citation&&<p className="mt-1 text-sm text-slate-600">{a.citation}</p>}</div></div>)}</div>;
 }
 
 function ActivityTab({ activity }: { activity: MemberActivity[] }) {

@@ -20,7 +20,7 @@ interface AuthContextValue {
   loading: boolean;
   setActiveOrgId: (orgId: string) => void;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, firstName: string, lastName: string, organisationId?: string, teamId?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -189,11 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
-  async function signUp(email: string, password: string, firstName: string, lastName: string) {
+  async function signUp(email: string, password: string, firstName: string, lastName: string, organisationId?: string, teamId?: string) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { first_name: firstName, last_name: lastName } },
+      options: { data: { first_name: firstName, last_name: lastName, organisation_id: organisationId || null, team_id: teamId || null } },
     });
     return { error: error?.message ?? null };
   }

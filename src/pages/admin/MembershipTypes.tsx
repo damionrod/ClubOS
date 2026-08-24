@@ -8,11 +8,13 @@ import { Modal } from '@/components/ui/Modal';
 import { FormField, TextInput, Select, TextArea, Checkbox } from '@/components/ui/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatCurrency } from '@/lib/utils';
+import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { Plus, Pencil, DollarSign, Users, Vote, Award } from 'lucide-react';
 import type { MembershipType } from '@/types/database';
 
 export function MembershipTypes() {
   const { activeOrg } = useAuth();
+  const { currency } = useOrganisationCurrency();
   const [types, setTypes] = useState<MembershipType[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -63,7 +65,7 @@ export function MembershipTypes() {
         <MetricCard label="Total Types" value={types.length} icon={<Users className="h-5 w-5" />} />
         <MetricCard label="Active Types" value={types.filter((t) => t.is_active).length} icon={<Users className="h-5 w-5" />} accent="success" />
         <MetricCard label="With Voting" value={types.filter((t) => t.voting_rights).length} icon={<Vote className="h-5 w-5" />} accent="warning" />
-        <MetricCard label="Avg. Annual Fee" value={formatCurrency(types.reduce((s, t) => s + Number(t.annual_fee), 0) / (types.length || 1))} icon={<DollarSign className="h-5 w-5" />} accent="primary" />
+        <MetricCard label="Avg. Annual Fee" value={formatCurrency(types.reduce((s, t) => s + Number(t.annual_fee), 0) / (types.length || 1), currency)} icon={<DollarSign className="h-5 w-5" />} accent="primary" />
       </div>
 
       {loading ? (
@@ -86,11 +88,11 @@ export function MembershipTypes() {
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Annual Fee</span>
-                  <span className="font-semibold text-slate-900">{formatCurrency(t.annual_fee)}</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(t.annual_fee, currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Joining Fee</span>
-                  <span className="font-semibold text-slate-900">{formatCurrency(t.joining_fee)}</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(t.joining_fee, currency)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Duration</span>

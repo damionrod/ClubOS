@@ -1,16 +1,19 @@
 import { type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, User, Calendar, CreditCard, MoreHorizontal, LogOut, ArrowLeft } from 'lucide-react';
+import { Home, User, Calendar, CreditCard, MoreHorizontal, LogOut, ArrowLeft, Vote, Newspaper } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { cn } from '@/lib/utils';
 import { useOrganisationBranding } from '@/hooks/useOrganisationBranding';
+import { usePendingVotes } from '@/hooks/usePendingVotes';
 
 const bottomNav = [
   { label: 'Home', icon: Home, path: '/member' },
   { label: 'Membership', icon: User, path: '/member/membership' },
   { label: 'Events', icon: Calendar, path: '/member/events' },
   { label: 'Payments', icon: CreditCard, path: '/member/payments' },
+  { label: 'Voting', icon: Vote, path: '/member/voting' },
+  { label: 'News', icon: Newspaper, path: '/member/news' },
   { label: 'More', icon: MoreHorizontal, path: '/member/more' },
 ];
 
@@ -18,6 +21,7 @@ export function MemberLayout({ children }: { children: ReactNode }) {
   const { profile, activeOrg, signOut } = useAuth();
   const location = useLocation();
   const { branding } = useOrganisationBranding(activeOrg?.id);
+  const { count: pendingVotes } = usePendingVotes(activeOrg?.id);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
@@ -34,6 +38,11 @@ export function MemberLayout({ children }: { children: ReactNode }) {
             <span className="text-sm font-semibold text-slate-900">{activeOrg?.trading_name ?? 'ClubOS'}</span>
           </div>
           <div className="flex items-center gap-2">
+            <NavLink to="/member/voting" className="relative inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              <Vote className="h-4 w-4" />
+              Voting
+              {pendingVotes > 0 && <span className="ml-1 min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[10px] font-bold leading-5 text-white">{pendingVotes > 99 ? '99+' : pendingVotes}</span>}
+            </NavLink>
             <NavLink to="/admin" className="text-xs text-slate-400 hover:text-slate-600">
               <ArrowLeft className="h-4 w-4 inline" /> Admin
             </NavLink>
@@ -72,7 +81,7 @@ export function MemberLayout({ children }: { children: ReactNode }) {
                   )
                 }
               >
-                <Icon className="h-5 w-5" />
+                <span className="relative"><Icon className="h-5 w-5" />{item.path === '/member/voting' && pendingVotes > 0 && <span className="absolute -right-2 -top-2 min-w-4 rounded-full bg-red-600 px-1 text-[10px] font-bold leading-4 text-white">{pendingVotes > 9 ? '9+' : pendingVotes}</span>}</span>
                 {item.label}
               </NavLink>
             );

@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Building2, Plus, Search, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Modal } from '@/components/ui/Modal';
+import { SUPPORTED_CURRENCIES } from '@/lib/currencies';
 
 type Plan = { id:string; name:string; description:string|null; price:number; billing_cycle:string; member_limit:number|null; is_active:boolean };
 type Organisation = { id:string; legal_name:string; trading_name:string; slug:string; organisation_type:string; email:string|null; city:string|null; country:string; status:string; subscriptions?: Array<{status:string; plan_id:string; subscription_plans?: {name:string; price:number}|null}> };
 
-const emptyForm = { legal_name:'', trading_name:'', slug:'', organisation_type:'sports_club', email:'', phone:'', city:'', region:'', country:'NZ', status:'active', plan_id:'' };
+const emptyForm = { legal_name:'', trading_name:'', slug:'', organisation_type:'sports_club', email:'', phone:'', city:'', region:'', country:'NZ', currency:'NZD', status:'active', plan_id:'' };
 
 export function PlatformOrganisations(){
   const [plans,setPlans]=useState<Plan[]>([]); const [orgs,setOrgs]=useState<Organisation[]>([]); const [q,setQ]=useState('');
@@ -35,7 +36,8 @@ export function PlatformOrganisations(){
     const plan=plans.find(p=>p.id===form.plan_id);
     const {error:subError}=await supabase.from('subscriptions').insert({organisation_id:org.id,plan_id:form.plan_id,status:'active',billing_cycle:plan?.billing_cycle??'monthly',start_date:new Date().toISOString()});
     if(subError){await supabase.from('organisations').delete().eq('id',org.id);setError(subError.message);setSaving(false);return}
-    await supabase.from('organisation_settings').insert({organisation_id:org.id}).select();
+    const { error: settingsError } = await supabase.from('organisation_settings').insert({organisation_id:org.id,currency:form.currency}).select();
+    if(settingsError){await supabase.from('subscriptions').delete().eq('organisation_id',org.id);await supabase.from('organisations').delete().eq('id',org.id);setError(settingsError.message);setSaving(false);return}
     setForm(emptyForm); setOpen(false); setSaving(false); await load();
   }
   return <div className="space-y-6">
@@ -52,7 +54,7 @@ export function PlatformOrganisations(){
         <label className="md:col-span-2"><span className="label">Subscription plan *</span><select className="input" value={form.plan_id} onChange={e=>setForm(f=>({...f,plan_id:e.target.value}))}><option value="" disabled>Select an active plan</option>{plans.map(p=><option key={p.id} value={p.id}>{p.name} — ${Number(p.price).toFixed(2)}/{p.billing_cycle}{p.member_limit?` — up to ${p.member_limit} members`:''}</option>)}</select><span className="mt-1 block text-xs text-slate-500">Plans are loaded live from Platform Admin → Plans.</span></label>
         <label><span className="label">Email</span><input type="email" className="input" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/></label><label><span className="label">Phone</span><input className="input" value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))}/></label>
         <label><span className="label">City</span><input className="input" value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))}/></label><label><span className="label">Region</span><input className="input" value={form.region} onChange={e=>setForm(f=>({...f,region:e.target.value}))}/></label>
-        <label><span className="label">Country</span><input className="input" value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value.toUpperCase()}))}/></label><label><span className="label">Status</span><select className="input" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="active">Active</option><option value="trial">Trial</option><option value="suspended">Suspended</option></select></label>
+        <label><span className="label">Country</span><input className="input" value={form.country} onChange={e=>setForm(f=>({...f,country:e.target.value.toUpperCase()}))}/></label><label><span className="label">Currency *</span><select className="input" value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))}>{SUPPORTED_CURRENCIES.map(c=><option key={c.code} value={c.code}>{c.code} — {c.name} ({c.symbol})</option>)}</select><span className="mt-1 block text-xs text-slate-500">Sets the organisation's financial currency across ClubOS.</span></label><label><span className="label">Status</span><select className="input" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option value="active">Active</option><option value="trial">Trial</option><option value="suspended">Suspended</option></select></label>
       </div>
     </Modal>
   </div>

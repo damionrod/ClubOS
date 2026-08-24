@@ -94,6 +94,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
           { label: 'Dashboard', path: '/admin/governance' },
           { label: 'Committee', path: '/admin/governance/committee' },
           { label: 'Motions', path: '/admin/governance/motions' },
+          { label: 'Awards & Recognition', path: '/admin/governance/awards' },
         ],
       },
       { label: 'Documents', icon: <FileText className="h-4 w-4" />, module: 'documents', path: '/admin/documents' },
@@ -129,7 +130,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       {
         label: 'Settings', icon: <Settings className="h-4 w-4" />, module: 'core', minLevel: 'read_only',
         children: [
-          { label: 'Club Details', path: '/admin/settings' },
+          { label: 'Organisation Settings', path: '/admin/settings' },
           { label: 'Branding', path: '/admin/settings/branding' },
           { label: 'Users', path: '/admin/settings/users' },
           { label: 'Roles', path: '/admin/settings/roles' },

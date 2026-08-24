@@ -74,6 +74,7 @@ export interface OrganisationSettings {
   guardian_age_threshold: number;
   default_membership_status: string;
   compliance_profile: string | null;
+  default_team_membership_type_id?: string | null;
 }
 
 export interface OrganisationBranding {
@@ -330,7 +331,9 @@ export interface Team {
   contact: string | null;
   status: string;
   is_archived: boolean;
+  membership_type_id?: string | null;
   sports?: Sport;
+  membership_types?: MembershipType;
 }
 
 export interface TeamMember {

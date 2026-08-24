@@ -7,12 +7,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { CreditCard, User, Calendar, Vote, Mail, ShoppingBag, Award, FileText, Bell, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDate, fullName } from '@/lib/utils';
+import { usePendingVotes } from '@/hooks/usePendingVotes';
 import type { Member } from '@/types/database';
 
 export function MemberDashboard() {
   const { profile, activeOrg } = useAuth();
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
+  const [news, setNews] = useState<any[]>([]);
+  const { count: pendingVotes } = usePendingVotes(activeOrg?.id);
 
   useEffect(() => {
     if (!profile || !activeOrg) return;
@@ -21,6 +24,11 @@ export function MemberDashboard() {
       setLoading(false);
     });
   }, [profile, activeOrg]);
+
+  useEffect(() => {
+    if (!activeOrg) return;
+    supabase.from('member_awards').select('id,awarded_on,citation,award_types(name),members(first_name,last_name,preferred_name)').eq('organisation_id',activeOrg.id).eq('visibility','members').order('awarded_on',{ascending:false}).limit(3).then(({data})=>setNews(data??[]));
+  }, [activeOrg?.id]);
 
   if (loading) {
     return <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="card h-32 animate-pulse" />)}</div>;
@@ -45,7 +53,7 @@ export function MemberDashboard() {
     { label: 'Pay Membership', icon: CreditCard, path: '/member/payments' },
     { label: 'Update Details', icon: User, path: '/member/profile' },
     { label: 'Buy Tickets', icon: Calendar, path: '/member/events' },
-    { label: 'Vote', icon: Vote, path: '/member/more' },
+    { label: pendingVotes > 0 ? `Vote (${pendingVotes})` : 'Vote', icon: Vote, path: '/member/voting' },
     { label: 'Contact Committee', icon: Mail, path: '/member/more' },
   ];
 
@@ -88,6 +96,18 @@ export function MemberDashboard() {
       </div>
 
       {/* Requires Attention */}
+      {pendingVotes > 0 && (
+        <div className="card border-red-200 bg-red-50 p-4">
+          <div className="flex items-center gap-3">
+            <Vote className="h-5 w-5 text-red-600" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">{pendingVotes} vote{pendingVotes === 1 ? '' : 's'} waiting for you</p>
+              <p className="text-xs text-red-700">An eligible motion is currently open for voting.</p>
+            </div>
+            <Link to="/member/voting" className="btn-primary ml-auto">Vote Now</Link>
+          </div>
+        </div>
+      )}
       {needsRenewal && (
         <div className="card border-warning-200 bg-warning-50 p-4">
           <div className="flex items-center gap-3">
@@ -121,10 +141,10 @@ export function MemberDashboard() {
         </div>
       </div>
 
-      {/* Announcements placeholder */}
+      {/* News & Updates */}
       <div className="card p-5">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">Club Announcements</h2>
-        <EmptyState title="No announcements" description="Club announcements will appear here." />
+        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-slate-900">News & Updates</h2><Link to="/member/news" className="text-xs font-medium text-primary-700">View all</Link></div>
+        {news.length===0 ? <EmptyState title="No updates" description="Awards, recognition and club updates will appear here." /> : <div className="space-y-3">{news.map((n:any)=><Link to="/member/news" key={n.id} className="flex gap-3 rounded-lg border border-slate-100 p-3 hover:bg-slate-50"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50"><Award className="h-5 w-5 text-amber-700"/></div><div><p className="text-sm font-semibold text-slate-900">{n.members?.preferred_name||n.members?.first_name} {n.members?.last_name} — {n.award_types?.name}</p><p className="text-xs text-slate-400">{formatDate(n.awarded_on,'short')}</p>{n.citation&&<p className="mt-1 line-clamp-2 text-xs text-slate-500">{n.citation}</p>}</div></Link>)}</div>}
       </div>
     </div>
   );

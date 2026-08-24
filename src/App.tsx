@@ -19,6 +19,7 @@ import { RolesStructure } from '@/pages/admin/RolesStructure';
 import { PaymentFeeSettings } from '@/pages/admin/PaymentFeeSettings';
 import { IncomeByCategoryReport } from '@/pages/admin/IncomeByCategoryReport';
 import { BrandingSettings } from '@/pages/admin/BrandingSettings';
+import { OrganisationSettings } from '@/pages/admin/OrganisationSettings';
 import { EventsPage } from '@/pages/admin/EventsPage';
 import { EventCheckin } from '@/pages/admin/EventCheckin';
 import { MemberEvents } from '@/pages/member/MemberEvents';
@@ -28,7 +29,12 @@ import { DemoModulePage } from '@/pages/admin/DemoModules';
 import { PlatformDemoPage } from '@/pages/platform/PlatformDemoPages';
 import { PlatformOrganisations } from '@/pages/platform/PlatformOrganisations';
 import { PlatformFeeSettings } from '@/pages/platform/PlatformFeeSettings';
-import { MemberMembership, MemberProfile, MemberPayments, MemberMore } from '@/pages/member/MemberDemoPages';
+import { MemberMembership, MemberPayments, MemberMore } from '@/pages/member/MemberDemoPages';
+import { MemberProfile as EditableMemberProfile } from '@/pages/member/MemberProfile';
+import { MemberVoting } from '@/pages/member/MemberVoting';
+import { MotionsPage } from '@/pages/admin/MotionsPage';
+import { AwardsRecognition } from '@/pages/admin/AwardsRecognition';
+import { MemberNews } from '@/pages/member/MemberNews';
 import type { ReactNode } from 'react';
 
 function ProtectedRoute({ children, requirePlatformAdmin = false }: { children: ReactNode; requirePlatformAdmin?: boolean }) {
@@ -99,7 +105,8 @@ function AppRoutes() {
       <Route path="/admin/communications/history" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="history" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/governance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="governance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/governance/committee" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="committee" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/governance/motions" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="motions" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/governance/motions" element={<ProtectedRoute><PermissionLoader><AdminRoute><MotionsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/governance/awards" element={<ProtectedRoute><PermissionLoader><AdminRoute><AwardsRecognition /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/documents" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="documents" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/merchandise" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="merchandise" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/donations" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="donations" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
@@ -109,7 +116,7 @@ function AppRoutes() {
       <Route path="/admin/privacy" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="privacy" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/compliance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="compliance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/reports" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="reports" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/settings" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="clubsettings" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/settings" element={<ProtectedRoute><PermissionLoader><AdminRoute><OrganisationSettings /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/settings/branding" element={<ProtectedRoute><PermissionLoader><AdminRoute><BrandingSettings /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/settings/users" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="users" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/settings/roles" element={<ProtectedRoute><PermissionLoader><AdminRoute><RolesStructure /></AdminRoute></PermissionLoader></ProtectedRoute>} />
@@ -121,7 +128,9 @@ function AppRoutes() {
       <Route path="/member/events" element={<ProtectedRoute><MemberLayout><MemberEvents /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/payments" element={<ProtectedRoute><MemberLayout><MemberPayments /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/more" element={<ProtectedRoute><MemberLayout><MemberMore /></MemberLayout></ProtectedRoute>} />
-      <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><MemberProfile /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><EditableMemberProfile /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/voting" element={<ProtectedRoute><MemberLayout><MemberVoting /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/news" element={<ProtectedRoute><MemberLayout><MemberNews /></MemberLayout></ProtectedRoute>} />
 
       {/* Platform Admin Portal */}
       <Route path="/platform-admin" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDashboard /></PlatformLayout></ProtectedRoute>} />
