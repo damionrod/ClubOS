@@ -1,151 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { CreditCard, User, Calendar, Vote, Mail, ShoppingBag, Award, FileText, Bell, ArrowRight } from 'lucide-react';
+import { CreditCard, User, Calendar, Vote, ShoppingBag, Award, Heart, ArrowRight, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatDate, fullName } from '@/lib/utils';
 import { usePendingVotes } from '@/hooks/usePendingVotes';
+import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
+import { formatCurrency } from '@/lib/utils';
 import type { Member } from '@/types/database';
 
-export function MemberDashboard() {
-  const { profile, activeOrg } = useAuth();
-  const [member, setMember] = useState<Member | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [news, setNews] = useState<any[]>([]);
-  const { count: pendingVotes } = usePendingVotes(activeOrg?.id);
-
-  useEffect(() => {
-    if (!profile || !activeOrg) return;
-    supabase.from('members').select('*, memberships(membership_types(*))').eq('organisation_id', activeOrg.id).eq('user_id', profile.id).maybeSingle().then(({ data }) => {
-      setMember(data as unknown as Member);
-      setLoading(false);
-    });
-  }, [profile, activeOrg]);
-
-  useEffect(() => {
-    if (!activeOrg) return;
-    supabase.from('member_awards').select('id,awarded_on,citation,award_types(name),members(first_name,last_name,preferred_name)').eq('organisation_id',activeOrg.id).eq('visibility','members').order('awarded_on',{ascending:false}).limit(3).then(({data})=>setNews(data??[]));
-  }, [activeOrg?.id]);
-
-  if (loading) {
-    return <div className="space-y-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="card h-32 animate-pulse" />)}</div>;
-  }
-
-  if (!member) {
-    return (
-      <div className="card">
-        <EmptyState
-          icon={<User className="h-6 w-6" />}
-          title="No membership found"
-          description="You don't have a membership linked to this organisation yet. Contact your club administrator."
-        />
-      </div>
-    );
-  }
-
-  const membershipType = member.memberships?.[0]?.membership_types;
-  const needsRenewal = member.paid_until && new Date(member.paid_until) < new Date();
-
-  const quickActions = [
-    { label: 'Pay Membership', icon: CreditCard, path: '/member/payments' },
-    { label: 'Update Details', icon: User, path: '/member/profile' },
-    { label: 'Buy Tickets', icon: Calendar, path: '/member/events' },
-    { label: pendingVotes > 0 ? `Vote (${pendingVotes})` : 'Vote', icon: Vote, path: '/member/voting' },
-    { label: 'Contact Committee', icon: Mail, path: '/member/more' },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Welcome, {member.preferred_name ?? member.first_name}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">{activeOrg?.trading_name}</p>
-      </div>
-
-      {/* Membership Card */}
-      <div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 p-6 text-white shadow-lg">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-primary-200">Membership Card</p>
-            <p className="mt-2 text-xl font-bold">{activeOrg?.trading_name}</p>
-          </div>
-          <StatusBadge status={member.status} variant={member.status === 'active' ? 'success' : 'warning'} />
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-primary-200">Member Number</p>
-            <p className="text-sm font-semibold">{member.member_number}</p>
-          </div>
-          <div>
-            <p className="text-xs text-primary-200">Membership Type</p>
-            <p className="text-sm font-semibold">{membershipType?.name ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-primary-200">Member Since</p>
-            <p className="text-sm font-semibold">{formatDate(member.member_since, 'short')}</p>
-          </div>
-          <div>
-            <p className="text-xs text-primary-200">Paid Until</p>
-            <p className="text-sm font-semibold">{member.paid_until ? formatDate(member.paid_until, 'short') : '—'}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Requires Attention */}
-      {pendingVotes > 0 && (
-        <div className="card border-red-200 bg-red-50 p-4">
-          <div className="flex items-center gap-3">
-            <Vote className="h-5 w-5 text-red-600" />
-            <div>
-              <p className="text-sm font-semibold text-red-800">{pendingVotes} vote{pendingVotes === 1 ? '' : 's'} waiting for you</p>
-              <p className="text-xs text-red-700">An eligible motion is currently open for voting.</p>
-            </div>
-            <Link to="/member/voting" className="btn-primary ml-auto">Vote Now</Link>
-          </div>
-        </div>
-      )}
-      {needsRenewal && (
-        <div className="card border-warning-200 bg-warning-50 p-4">
-          <div className="flex items-center gap-3">
-            <Bell className="h-5 w-5 text-warning-600" />
-            <div>
-              <p className="text-sm font-semibold text-warning-800">Membership Renewal Due</p>
-              <p className="text-xs text-warning-700">Your membership expired on {formatDate(member.paid_until, 'short')}. Please renew to maintain your membership.</p>
-            </div>
-            <Link to="/member/payments" className="btn-primary ml-auto">Renew Now</Link>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">Quick Actions</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.label}
-                to={action.path}
-                className="card-hover flex flex-col items-center gap-2 p-4 text-center"
-              >
-                <Icon className="h-5 w-5 text-primary-700" />
-                <span className="text-xs font-medium text-slate-700">{action.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* News & Updates */}
-      <div className="card p-5">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-slate-900">News & Updates</h2><Link to="/member/news" className="text-xs font-medium text-primary-700">View all</Link></div>
-        {news.length===0 ? <EmptyState title="No updates" description="Awards, recognition and club updates will appear here." /> : <div className="space-y-3">{news.map((n:any)=><Link to="/member/news" key={n.id} className="flex gap-3 rounded-lg border border-slate-100 p-3 hover:bg-slate-50"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50"><Award className="h-5 w-5 text-amber-700"/></div><div><p className="text-sm font-semibold text-slate-900">{n.members?.preferred_name||n.members?.first_name} {n.members?.last_name} — {n.award_types?.name}</p><p className="text-xs text-slate-400">{formatDate(n.awarded_on,'short')}</p>{n.citation&&<p className="mt-1 line-clamp-2 text-xs text-slate-500">{n.citation}</p>}</div></Link>)}</div>}
-      </div>
-    </div>
-  );
+export function MemberDashboard(){
+ const {profile,activeOrg}=useAuth();const {currency}=useOrganisationCurrency();const [member,setMember]=useState<Member|null>(null);const [loading,setLoading]=useState(true);const [news,setNews]=useState<any[]>([]);const [pendingAmount,setPendingAmount]=useState(0);const [pendingCount,setPendingCount]=useState(0);const [teamRows,setTeamRows]=useState<any[]>([]);const {count:pendingVotes}=usePendingVotes(activeOrg?.id);
+ useEffect(()=>{if(!profile||!activeOrg)return;(async()=>{const {data}=await supabase.from('members').select('*, memberships(membership_types(*))').eq('organisation_id',activeOrg.id).eq('user_id',profile.id).maybeSingle();setMember(data as unknown as Member);if(data?.id){const [{data:charges},{data:donations},{data:teams}]=await Promise.all([supabase.from('member_subscription_charges').select('amount,status').eq('organisation_id',activeOrg.id).eq('member_id',data.id).in('status',['pending','unpaid']),supabase.from('donations').select('amount,status').eq('organisation_id',activeOrg.id).eq('member_id',data.id).eq('status','pending'),supabase.from('team_members').select('id,season,subscription_fee,teams(name),subscription_types(name)').eq('member_id',data.id).eq('role','player').order('created_at',{ascending:false}).limit(4)]);const pending=[...(charges??[]),...(donations??[])];setPendingAmount(pending.reduce((n:any,x:any)=>n+Number(x.amount||0),0));setPendingCount(pending.length);setTeamRows(teams??[])}setLoading(false)})()},[profile?.id,activeOrg?.id]);
+ useEffect(()=>{if(!activeOrg)return;supabase.from('member_awards').select('id,awarded_on,citation,award_types(name),members(first_name,last_name,preferred_name)').eq('organisation_id',activeOrg.id).eq('visibility','members').order('awarded_on',{ascending:false}).limit(3).then(({data})=>setNews(data??[]))},[activeOrg?.id]);
+ if(loading)return <div className="space-y-4">{[1,2,3].map(i=><div key={i} className="card h-32 animate-pulse"/>)}</div>;
+ if(!member)return <div className="card"><EmptyState icon={<User className="h-6 w-6"/>} title="No membership found" description="You don't have a membership linked to this organisation yet. Contact your club administrator."/></div>;
+ const membershipType=(member as any).memberships?.[0]?.membership_types;
+ const actions=[{label:'Pay subscriptions',desc:pendingCount?`${pendingCount} pending · ${formatCurrency(pendingAmount,currency)}`:'Nothing outstanding',icon:CreditCard,path:'/member/payments',accent:pendingCount?'text-amber-700':'text-primary-700'},{label:'Club Shop',desc:'Browse and buy merchandise',icon:ShoppingBag,path:'/member/merchandise',accent:'text-primary-700'},{label:'Make a Donation',desc:'Support the club',icon:Heart,path:'/member/donations',accent:'text-rose-600'},{label:'Events & Tickets',desc:'View events and buy tickets',icon:Calendar,path:'/member/events',accent:'text-primary-700'},{label:'Update Profile',desc:'Details, photo and team',icon:User,path:'/member/profile',accent:'text-primary-700'},{label:pendingVotes?`Vote now (${pendingVotes})`:'Voting',desc:pendingVotes?'You have a pending vote':'No pending votes',icon:Vote,path:'/member/voting',accent:pendingVotes?'text-red-600':'text-primary-700'}];
+ return <div className="space-y-6"><div><h1 className="text-2xl font-bold">Welcome, {(member as any).preferred_name??member.first_name}</h1><p className="mt-1 text-sm text-slate-500">{activeOrg?.trading_name}</p></div><div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 p-6 text-white shadow-lg"><div className="flex items-start justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-primary-200">Membership Card</p><p className="mt-2 text-xl font-bold">{activeOrg?.trading_name}</p></div><StatusBadge status={(member as any).status} variant={(member as any).status==='active'?'success':'warning'}/></div><div className="mt-6 grid grid-cols-2 gap-4"><div><p className="text-xs text-primary-200">Member Number</p><p className="text-sm font-semibold">{(member as any).member_number}</p></div><div><p className="text-xs text-primary-200">Membership Type</p><p className="text-sm font-semibold">{membershipType?.name??'—'}</p></div></div></div>{pendingCount>0&&<Link to="/member/payments" className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"><div><p className="font-semibold">Payment due</p><p className="text-sm">{pendingCount} outstanding item{pendingCount===1?'':'s'} · {formatCurrency(pendingAmount,currency)}</p></div><div className="flex items-center gap-2 font-semibold">Pay now <ArrowRight className="h-4 w-4"/></div></Link>}<div><h2 className="mb-3 font-semibold">What would you like to do?</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{actions.map(a=>{const Icon=a.icon;return <Link key={a.path} to={a.path} className="card-hover p-5"><Icon className={`h-6 w-6 ${a.accent}`}/><p className="mt-3 font-semibold">{a.label}</p><p className="mt-1 text-sm text-slate-500">{a.desc}</p></Link>})}</div></div><div className="grid gap-5 lg:grid-cols-2"><div className="card p-5"><div className="flex items-center gap-2"><Users className="h-5 w-5 text-primary-700"/><h2 className="font-semibold">My teams & subscriptions</h2></div><div className="mt-4 space-y-3">{teamRows.length===0?<p className="text-sm text-slate-500">No team assignments yet.</p>:teamRows.map((r:any)=><div key={r.id} className="flex justify-between rounded-lg border p-3"><div><p className="font-medium">{r.teams?.name||'Team'}</p><p className="text-xs text-slate-500">{r.season||'Current season'} · {r.subscription_types?.name||'No subscription'}</p></div><p className="text-sm font-semibold">{formatCurrency(Number(r.subscription_fee||0),currency)}</p></div>)}</div></div><div className="card p-5"><div className="flex items-center gap-2"><Award className="h-5 w-5 text-primary-700"/><h2 className="font-semibold">Latest club updates</h2></div><div className="mt-4 space-y-3">{news.length===0?<p className="text-sm text-slate-500">No recent awards or updates.</p>:news.map((n:any)=><div key={n.id} className="rounded-lg border p-3"><p className="font-medium">{n.award_types?.name}</p><p className="text-sm text-slate-600">{n.members?.preferred_name||n.members?.first_name} {n.members?.last_name}</p><p className="mt-1 text-xs text-slate-500">{n.citation}</p></div>)}</div></div></div></div>
 }

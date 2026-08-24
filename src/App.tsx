@@ -32,7 +32,9 @@ import { DemoModulePage } from '@/pages/admin/DemoModules';
 import { PlatformDemoPage } from '@/pages/platform/PlatformDemoPages';
 import { PlatformOrganisations } from '@/pages/platform/PlatformOrganisations';
 import { PlatformFeeSettings } from '@/pages/platform/PlatformFeeSettings';
-import { MemberMembership, MemberPayments, MemberMore } from '@/pages/member/MemberDemoPages';
+import { MemberMembership, MemberMore } from '@/pages/member/MemberDemoPages';
+import { MemberPayments } from '@/pages/member/MemberPayments';
+import { MemberDonations } from '@/pages/member/MemberDonations';
 import { MemberProfile as EditableMemberProfile } from '@/pages/member/MemberProfile';
 import { MemberVoting } from '@/pages/member/MemberVoting';
 import { MotionsPage } from '@/pages/admin/MotionsPage';
@@ -142,6 +144,7 @@ function AppRoutes() {
       <Route path="/member/voting" element={<ProtectedRoute><MemberLayout><MemberVoting /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/news" element={<ProtectedRoute><MemberLayout><MemberNews /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/merchandise" element={<ProtectedRoute><MemberLayout><MemberMerchandise /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/donations" element={<ProtectedRoute><MemberLayout><MemberDonations /></MemberLayout></ProtectedRoute>} />
 
       {/* Platform Admin Portal */}
       <Route path="/platform-admin" element={<ProtectedRoute requirePlatformAdmin><PlatformLayout><PlatformDashboard /></PlatformLayout></ProtectedRoute>} />

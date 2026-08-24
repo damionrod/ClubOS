@@ -6,285 +6,52 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Modal } from '@/components/ui/Modal';
 import { FormField, Select, TextArea, TextInput } from '@/components/ui/FormField';
-import { formatCurrency } from '@/lib/utils';
+import { SearchBar } from '@/components/ui/SearchBar';
+import { formatCurrency, fullName } from '@/lib/utils';
 import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
-import { Trophy, Plus, Users, Pencil, Trash2, Settings2 } from 'lucide-react';
+import { Trophy, Plus, Users, Pencil, Trash2, Image as ImageIcon, UserPlus, X } from 'lucide-react';
 import type { Sport } from '@/types/database';
 import { notifySuccess } from '@/lib/notifications';
 
-type SubscriptionType={id:string;name:string;fee:number;billing_period:string;is_active:boolean};
+type SubscriptionType={id:string;name:string;fee:number;billing_period:string;is_active:boolean;sport_id:string|null;team_id:string|null;season:string|null};
+type MemberOption={id:string;member_number:string;first_name:string;last_name:string;preferred_name:string|null;email:string|null;photo_url:string|null;status:string};
+type RosterRow={id:string;member_id:string;subscription_type_id:string|null;subscription_fee:number|null;season:string|null;members:MemberOption|null;subscription_types:{id:string;name:string;fee:number}|null};
 type Team=any;
 
-type TeamForm = {
-  name: string;
-  sport_id: string;
-  description: string;
-  contact: string;
-  status: string;
-  subscription_type_id: string;
-};
+type TeamForm={name:string;sport_id:string;season:string;description:string;contact:string;status:string;logo_url:string};
+const emptyForm:TeamForm={name:'',sport_id:'',season:'',description:'',contact:'',status:'active',logo_url:''};
 
-const emptyForm: TeamForm = {
-  name: '',
-  sport_id: '',
-  description: '',
-  contact: '',
-  status: 'active',
-  subscription_type_id: '',
-};
-
-export function TeamsPage() {
-  const { activeOrg } = useAuth();
-  const { currency } = useOrganisationCurrency();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [sports, setSports] = useState<Sport[]>([]);
-  const [subscriptions, setSubscriptions] = useState<SubscriptionType[]>([]);
-  const [defaultSubscriptionId, setDefaultSubscriptionId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Team | null>(null);
-  const [form, setForm] = useState<TeamForm>(emptyForm);
-  const [saving, setSaving] = useState(false);
-
-  const defaultSubscription = useMemo(
-    () => subscriptions.find((s) => s.id === defaultSubscriptionId) ?? null,
-    [subscriptions, defaultSubscriptionId],
-  );
-
-  async function load() {
-    if (!activeOrg) return;
-    setLoading(true);
-    const [teamRes, sportRes, subRes, settingsRes] = await Promise.all([
-      supabase
-        .from('teams')
-        .select('*, sports(*), subscription_types(*)')
-        .eq('organisation_id', activeOrg.id)
-        .eq('is_archived', false)
-        .order('name'),
-      supabase.from('sports').select('*').eq('organisation_id', activeOrg.id).eq('status', 'active').order('name'),
-      supabase.from('subscription_types').select('*').eq('organisation_id', activeOrg.id).eq('is_active', true).order('sort_order'),
-      supabase.from('organisation_settings').select('default_team_subscription_type_id').eq('organisation_id', activeOrg.id).maybeSingle(),
-    ]);
-
-    setTeams((teamRes.data ?? []) as unknown as Team[]);
-    setSports((sportRes.data ?? []) as Sport[]);
-    setSubscriptions((subRes.data ?? []) as SubscriptionType[]);
-    setDefaultSubscriptionId(settingsRes.data?.default_team_subscription_type_id ?? '');
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    load();
-  }, [activeOrg?.id]);
-
-  function openCreate() {
-    setEditing(null);
-    setForm({
-      ...emptyForm,
-      sport_id: sports[0]?.id ?? '',
-      subscription_type_id: defaultSubscriptionId || subscriptions[0]?.id || '',
-    });
-    setModalOpen(true);
-  }
-
-  function openEdit(team: Team) {
-    setEditing(team);
-    setForm({
-      name: team.name,
-      sport_id: team.sport_id,
-      description: team.description ?? '',
-      contact: team.contact ?? '',
-      status: team.status,
-      subscription_type_id: team.subscription_type_id ?? '',
-    });
-    setModalOpen(true);
-  }
-
-  async function saveTeam() {
-    if (!activeOrg || !form.name.trim() || !form.sport_id) return;
-    setSaving(true);
-    const payload = {
-      organisation_id: activeOrg.id,
-      name: form.name.trim(),
-      sport_id: form.sport_id,
-      season: sports.find((s) => s.id === form.sport_id)?.season || null,
-      description: form.description.trim() || null,
-      contact: form.contact.trim() || null,
-      status: form.status,
-      subscription_type_id: form.subscription_type_id || null,
-      is_archived: false,
-    };
-
-    const { error } = editing
-      ? await supabase.from('teams').update(payload).eq('id', editing.id).eq('organisation_id', activeOrg.id)
-      : await supabase.from('teams').insert(payload);
-
-    setSaving(false);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    setModalOpen(false);
-    notifySuccess(editing ? 'Team updated successfully.' : 'Team created successfully.');
-    await load();
-  }
-
-  async function deleteTeam(team: Team) {
-    if (!activeOrg) return;
-    if (!window.confirm(`Delete team “${team.name}”? Team player assignments for this team will also be removed.`)) return;
-    const { error } = await supabase.from('teams').delete().eq('id', team.id).eq('organisation_id', activeOrg.id);
-    if (error) alert(error.message);
-    else { notifySuccess('Team deleted.'); await load(); }
-  }
-
-  async function updateDefaultSubscription(value: string) {
-    if (!activeOrg) return;
-    setDefaultSubscriptionId(value);
-    const { error } = await supabase
-      .from('organisation_settings')
-      .update({ default_team_subscription_type_id: value || null })
-      .eq('organisation_id', activeOrg.id);
-    if (error) {
-      alert(error.message);
-      await load();
-    } else { notifySuccess('Default team subscription saved.'); }
-  }
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Teams"
-        description={`${teams.length} teams · create, edit, delete and assign a subscription to each team`}
-        actions={<button className="btn-primary" onClick={openCreate}><Plus className="h-4 w-4" /> New Team</button>}
-      />
-
-      <div className="card p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
-              <Settings2 className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-slate-900">Default team subscription</h2>
-              <p className="text-sm text-slate-500">This subscription is preselected whenever a new team is created. It can still be changed for that team.</p>
-            </div>
-          </div>
-          <div className="w-full md:w-80">
-            <Select value={defaultSubscriptionId} onChange={(e) => updateDefaultSubscription(e.target.value)}>
-              <option value="">No default subscription</option>
-              {subscriptions.map((s) => (
-                <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.fee, currency)}</option>
-              ))}
-            </Select>
-            {defaultSubscription && <p className="mt-1 text-xs text-slate-500">Current default: {defaultSubscription.name}</p>}
-          </div>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="card h-40 animate-pulse" />)}</div>
-      ) : teams.length === 0 ? (
-        <div className="card">
-          <EmptyState icon={<Trophy className="h-6 w-6" />} title="No teams yet" description="Create your first team and assign its subscription." action={<button className="btn-primary" onClick={openCreate}><Plus className="h-4 w-4" /> New Team</button>} />
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {teams.map((t) => {
-            const subscription = t.subscription_types;
-            return (
-              <div key={t.id} className="card-hover p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-700">
-                      <Trophy className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">{t.name}</h3>
-                      <p className="text-xs text-slate-500">{t.sports?.name || 'Sport'}{t.sports?.season ? ` · ${t.sports.season}` : t.season ? ` · ${t.season}` : ''}</p>
-                    </div>
-                  </div>
-                  <StatusBadge status={t.status} />
-                </div>
-
-                {t.description && <p className="mt-3 text-sm text-slate-500">{t.description}</p>}
-
-                <div className="mt-4 rounded-lg bg-slate-50 p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Team subscription</p>
-                  {subscription ? (
-                    <div className="mt-1 flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-slate-900">{subscription.name}</span>
-                      <span className="text-sm font-semibold text-primary-700">{formatCurrency(subscription.fee, currency)}</span>
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-sm text-amber-700">No subscription assigned</p>
-                  )}
-                </div>
-
-                <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-                  <Users className="h-4 w-4" /> Manage players from member/team assignments
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <button className="btn-secondary flex-1" onClick={() => openEdit(t)}><Pencil className="h-3.5 w-3.5" /> Edit</button>
-                  <button className="btn-ghost text-error-600 hover:bg-error-50" onClick={() => deleteTeam(t)} title="Delete team"><Trash2 className="h-4 w-4" /></button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editing ? 'Edit Team' : 'Create Team'}
-        description={editing ? 'Update the team details and assigned subscription.' : 'The organisation default subscription is preselected and can be changed.'}
-        size="lg"
-        footer={
-          <>
-            <button className="btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button className="btn-primary" onClick={saveTeam} disabled={saving || !form.name.trim() || !form.sport_id}>{saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Team'}</button>
-          </>
-        }
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Team name" required className="md:col-span-2">
-            <TextInput value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Premier Cricket" />
-          </FormField>
-
-          <FormField label="Sport" required>
-            <Select value={form.sport_id} onChange={(e) => setForm({ ...form, sport_id: e.target.value })}>
-              <option value="">Select sport</option>
-              {sports.map((s) => <option key={s.id} value={s.id}>{s.name}{s.season ? ` · ${s.season}` : ''}</option>)}
-            </Select>
-          </FormField>
-
-
-          <FormField label="Team subscription" required helpText="Defaults to the organisation setting for new teams, but can be changed here." className="md:col-span-2">
-            <Select value={form.subscription_type_id} onChange={(e) => setForm({ ...form, subscription_type_id: e.target.value })}>
-              <option value="">No subscription</option>
-              {subscriptions.map((s) => (
-                <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.fee, currency)} / {s.billing_period.replace('_',' ')}</option>
-              ))}
-            </Select>
-          </FormField>
-
-          <FormField label="Contact">
-            <TextInput value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Team contact email or phone" />
-          </FormField>
-
-          <FormField label="Status">
-            <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </FormField>
-
-          <FormField label="Description" className="md:col-span-2">
-            <TextArea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Team notes or description..." />
-          </FormField>
-        </div>
-      </Modal>
-    </div>
-  );
+export function TeamsPage(){
+ const {activeOrg}=useAuth(); const {currency}=useOrganisationCurrency();
+ const [teams,setTeams]=useState<Team[]>([]); const [sports,setSports]=useState<Sport[]>([]); const [subscriptions,setSubscriptions]=useState<SubscriptionType[]>([]); const [members,setMembers]=useState<MemberOption[]>([]);
+ const [loading,setLoading]=useState(true); const [modalOpen,setModalOpen]=useState(false); const [editing,setEditing]=useState<Team|null>(null); const [form,setForm]=useState<TeamForm>(emptyForm); const [saving,setSaving]=useState(false); const [logoFile,setLogoFile]=useState<File|null>(null); const [error,setError]=useState('');
+ const [rosterTeam,setRosterTeam]=useState<Team|null>(null); const [roster,setRoster]=useState<RosterRow[]>([]); const [rosterSearch,setRosterSearch]=useState(''); const [memberToAdd,setMemberToAdd]=useState(''); const [subscriptionToAdd,setSubscriptionToAdd]=useState(''); const [rosterSaving,setRosterSaving]=useState(false);
+ async function load(){if(!activeOrg)return;setLoading(true);const [teamRes,sportRes,subRes,memberRes]=await Promise.all([
+  supabase.from('teams').select('*, sports(*)').eq('organisation_id',activeOrg.id).eq('is_archived',false).order('name'),
+  supabase.from('sports').select('*').eq('organisation_id',activeOrg.id).eq('status','active').order('name'),
+  supabase.from('subscription_types').select('*').eq('organisation_id',activeOrg.id).eq('is_active',true).order('sort_order').order('name'),
+  supabase.from('members').select('id,member_number,first_name,last_name,preferred_name,email,photo_url,status').eq('organisation_id',activeOrg.id).eq('status','active').order('first_name')
+ ]);if(teamRes.error)setError(teamRes.error.message);setTeams(teamRes.data??[]);setSports((sportRes.data??[]) as Sport[]);setSubscriptions((subRes.data??[]) as SubscriptionType[]);setMembers((memberRes.data??[]) as MemberOption[]);setLoading(false)}
+ useEffect(()=>{load()},[activeOrg?.id]);
+ function openCreate(){setEditing(null);const sport=sports[0];setForm({...emptyForm,sport_id:sport?.id??'',season:sport?.season??''});setLogoFile(null);setError('');setModalOpen(true)}
+ function openEdit(t:Team){setEditing(t);setForm({name:t.name,sport_id:t.sport_id,season:t.season??'',description:t.description??'',contact:t.contact??'',status:t.status,logo_url:t.logo_url??''});setLogoFile(null);setError('');setModalOpen(true)}
+ async function uploadLogo(teamId:string,current:string){if(!logoFile||!activeOrg)return current||null;if(logoFile.size>5*1024*1024)throw new Error('Team logo must be 5 MB or smaller.');if(!['image/jpeg','image/png','image/webp','image/svg+xml'].includes(logoFile.type))throw new Error('Use JPG, PNG, WebP or SVG for the team logo.');const ext=logoFile.name.split('.').pop()||'png';const path=`${activeOrg.id}/${teamId}/logo-${Date.now()}.${ext}`;const {error}=await supabase.storage.from('team-logos').upload(path,logoFile,{upsert:true,contentType:logoFile.type});if(error)throw error;return supabase.storage.from('team-logos').getPublicUrl(path).data.publicUrl}
+ async function saveTeam(){if(!activeOrg||!form.name.trim()||!form.sport_id)return;setSaving(true);setError('');try{const payload={organisation_id:activeOrg.id,name:form.name.trim(),sport_id:form.sport_id,season:form.season.trim()||null,description:form.description.trim()||null,contact:form.contact.trim()||null,status:form.status,is_archived:false};let id=editing?.id;if(id){const {error}=await supabase.from('teams').update(payload).eq('id',id).eq('organisation_id',activeOrg.id);if(error)throw error}else{const {data,error}=await supabase.from('teams').insert(payload).select('id').single();if(error)throw error;id=data.id}const logo=await uploadLogo(id!,form.logo_url);if(logo!==form.logo_url){const {error}=await supabase.from('teams').update({logo_url:logo}).eq('id',id);if(error)throw error}setModalOpen(false);notifySuccess(editing?'Team updated successfully.':'Team created successfully.');await load()}catch(e:any){setError(e.message||'Unable to save team')}finally{setSaving(false)}}
+ async function deleteTeam(t:Team){if(!activeOrg||!confirm(`Delete team “${t.name}”? Player assignments for this team will also be removed.`))return;const {error}=await supabase.from('teams').delete().eq('id',t.id).eq('organisation_id',activeOrg.id);if(error)alert(error.message);else{notifySuccess('Team deleted.');await load()}}
+ const applicableSubscriptions=(team:Team|null)=>subscriptions.filter(s=>{if(!team)return false;return (!s.team_id||s.team_id===team.id)&&(!s.sport_id||s.sport_id===team.sport_id)&&(!s.season||!team.season||s.season===team.season)});
+ async function openRoster(t:Team){setRosterTeam(t);setRosterSearch('');setMemberToAdd('');setSubscriptionToAdd('');let q=supabase.from('team_members').select('id,member_id,subscription_type_id,subscription_fee,season,members(id,member_number,first_name,last_name,preferred_name,email,photo_url,status),subscription_types(id,name,fee)').eq('team_id',t.id).eq('role','player');if(t.season)q=q.eq('season',t.season);const {data,error}=await q.order('created_at');if(error){alert(error.message);return}setRoster((data??[]) as unknown as RosterRow[])}
+ const rosterMemberIds=useMemo(()=>new Set(roster.map(r=>r.member_id)),[roster]);
+ const availableMembers=useMemo(()=>{const q=rosterSearch.toLowerCase().trim();return members.filter(m=>!rosterMemberIds.has(m.id)&&(!q||`${fullName(m.first_name,m.last_name,m.preferred_name)} ${m.member_number} ${m.email??''}`.toLowerCase().includes(q))).slice(0,30)},[members,rosterMemberIds,rosterSearch]);
+ async function addPlayer(){if(!activeOrg||!rosterTeam||!memberToAdd||!subscriptionToAdd)return;const sub=applicableSubscriptions(rosterTeam).find(s=>s.id===subscriptionToAdd);if(!sub)return;setRosterSaving(true);const {error}=await supabase.from('team_members').upsert({organisation_id:activeOrg.id,team_id:rosterTeam.id,member_id:memberToAdd,season:rosterTeam.season||null,role:'player',subscription_type_id:sub.id,subscription_fee:Number(sub.fee),subscription_status:'active'},{onConflict:'team_id,member_id,season'});setRosterSaving(false);if(error){alert(error.message);return}notifySuccess('Player added to team.');await openRoster(rosterTeam)}
+ async function changePlayerSubscription(row:RosterRow,subscriptionId:string){if(!rosterTeam)return;const sub=applicableSubscriptions(rosterTeam).find(s=>s.id===subscriptionId);const {error}=await supabase.from('team_members').update({subscription_type_id:subscriptionId||null,subscription_fee:sub?Number(sub.fee):null,subscription_status:'active'}).eq('id',row.id);if(error)alert(error.message);else{notifySuccess('Player subscription updated.');await openRoster(rosterTeam)}}
+ async function removePlayer(row:RosterRow){if(!rosterTeam||!confirm(`Remove ${row.members?fullName(row.members):'this player'} from ${rosterTeam.name}?`))return;const {error}=await supabase.from('team_members').delete().eq('id',row.id);if(error)alert(error.message);else{notifySuccess('Player removed from team.');await openRoster(rosterTeam)}}
+ return <div className="space-y-6">
+  <PageHeader title="Teams" description={`${teams.length} teams · manage team details, logo, roster and each player’s season subscription`} actions={<button className="btn-primary" onClick={openCreate}><Plus className="h-4 w-4"/> New Team</button>}/>
+  {loading?<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{[1,2,3].map(i=><div key={i} className="card h-40 animate-pulse"/>)}</div>:teams.length===0?<div className="card"><EmptyState icon={<Trophy className="h-6 w-6"/>} title="No teams yet" description="Create your first team, then add players and choose each player’s subscription." action={<button className="btn-primary" onClick={openCreate}><Plus className="h-4 w-4"/> New Team</button>}/></div>:<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">{teams.map(t=><div key={t.id} className="card-hover p-5"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-3">{t.logo_url?<img src={t.logo_url} className="h-12 w-12 rounded-xl border bg-white object-contain p-1" alt={`${t.name} logo`}/>:<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-700"><Trophy className="h-5 w-5"/></div>}<div className="min-w-0"><h3 className="truncate font-semibold text-slate-900">{t.name}</h3><p className="text-xs text-slate-500">{t.sports?.name||'Sport'}{t.season?` · ${t.season}`:''}</p></div></div><StatusBadge status={t.status}/></div>{t.description&&<p className="mt-3 line-clamp-2 text-sm text-slate-500">{t.description}</p>}{t.contact&&<p className="mt-2 text-xs text-slate-500">Contact: {t.contact}</p>}<div className="mt-4 flex gap-2"><button className="btn-primary flex-1" onClick={()=>openRoster(t)}><Users className="h-4 w-4"/> Players</button><button className="btn-secondary" onClick={()=>openEdit(t)}><Pencil className="h-4 w-4"/></button><button className="btn-ghost text-error-600" onClick={()=>deleteTeam(t)}><Trash2 className="h-4 w-4"/></button></div></div>)}</div>}
+  <Modal open={modalOpen} onClose={()=>setModalOpen(false)} title={editing?'Edit Team':'Create Team'} description="Create the team record first. Player subscriptions are assigned individually in the team roster." size="lg" footer={<><button className="btn-secondary" onClick={()=>setModalOpen(false)}>Cancel</button><button className="btn-primary" onClick={saveTeam} disabled={saving||!form.name.trim()||!form.sport_id}>{saving?'Saving…':editing?'Save Changes':'Create Team'}</button></>}><div className="grid gap-4 md:grid-cols-2">{error&&<div className="md:col-span-2 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}<FormField label="Team name" required className="md:col-span-2"><TextInput value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="e.g. Premier Cricket"/></FormField><FormField label="Sport" required><Select value={form.sport_id} onChange={e=>{const s=sports.find(x=>x.id===e.target.value);setForm({...form,sport_id:e.target.value,season:form.season||s?.season||''})}}><option value="">Select sport</option>{sports.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</Select></FormField><FormField label="Season"><TextInput value={form.season} onChange={e=>setForm({...form,season:e.target.value})} placeholder="e.g. 2026/27"/></FormField><FormField label="Contact"><TextInput value={form.contact} onChange={e=>setForm({...form,contact:e.target.value})} placeholder="Email or phone"/></FormField><FormField label="Status"><Select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}><option value="active">Active</option><option value="inactive">Inactive</option></Select></FormField><FormField label="Description" className="md:col-span-2"><TextArea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} placeholder="Team description..."/></FormField><FormField label="Team logo" helpText="JPG, PNG, WebP or SVG; max 5 MB" className="md:col-span-2"><div className="flex items-center gap-4">{form.logo_url?<img src={form.logo_url} className="h-20 w-20 rounded-xl border object-contain p-1"/>:<div className="flex h-20 w-20 items-center justify-center rounded-xl border bg-slate-50 text-slate-300"><ImageIcon/></div>}<input className="input flex-1" type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={e=>setLogoFile(e.target.files?.[0]||null)}/></div></FormField></div></Modal>
+  <Modal open={!!rosterTeam} onClose={()=>setRosterTeam(null)} title={rosterTeam?`${rosterTeam.name} · Players`:'Players'} description={rosterTeam?`${rosterTeam.season||'Current season'} · assign each player their own subscription type`:''} size="xl" footer={<button className="btn-secondary" onClick={()=>setRosterTeam(null)}>Close</button>}>
+   {rosterTeam&&<div className="space-y-5"><div className="rounded-xl border bg-slate-50 p-4"><h3 className="font-semibold">Add player</h3><div className="mt-3 grid gap-3 md:grid-cols-3"><div><SearchBar value={rosterSearch} onChange={setRosterSearch} placeholder="Search members..."/><Select className="mt-2" value={memberToAdd} onChange={e=>setMemberToAdd(e.target.value)}><option value="">Select member</option>{availableMembers.map(m=><option key={m.id} value={m.id}>{fullName(m.first_name,m.last_name,m.preferred_name)} · {m.member_number}</option>)}</Select></div><FormField label="Participation / subscription"><Select value={subscriptionToAdd} onChange={e=>setSubscriptionToAdd(e.target.value)}><option value="">Select subscription</option>{applicableSubscriptions(rosterTeam).map(s=><option key={s.id} value={s.id}>{s.name} · {formatCurrency(Number(s.fee),currency)}</option>)}</Select></FormField><div className="flex items-end"><button className="btn-primary w-full" onClick={addPlayer} disabled={rosterSaving||!memberToAdd||!subscriptionToAdd}><UserPlus className="h-4 w-4"/> Add player</button></div></div><p className="mt-2 text-xs text-slate-500">Subscriptions are defined under Membership → Subscriptions and can be scoped to this sport, team or season.</p></div>
+   <div className="overflow-x-auto rounded-xl border"><table className="min-w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Player</th><th className="px-4 py-3">Subscription</th><th className="px-4 py-3">Fee</th><th className="px-4 py-3">Season</th><th className="px-4 py-3"></th></tr></thead><tbody className="divide-y">{roster.length===0?<tr><td colSpan={5} className="p-8 text-center text-slate-500">No players have been added to this team.</td></tr>:roster.map(r=><tr key={r.id}><td className="px-4 py-3"><div className="flex items-center gap-2">{r.members?.photo_url?<img src={r.members.photo_url} className="h-8 w-8 rounded-full object-cover"/>:<div className="h-8 w-8 rounded-full bg-slate-100"/>}<div><p className="font-medium">{r.members?fullName(r.members.first_name,r.members.last_name,r.members.preferred_name):'Member'}</p><p className="text-xs text-slate-500">{r.members?.member_number}</p></div></div></td><td className="px-4 py-3"><Select value={r.subscription_type_id??''} onChange={e=>changePlayerSubscription(r,e.target.value)}><option value="">No subscription</option>{applicableSubscriptions(rosterTeam).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</Select></td><td className="px-4 py-3 font-medium">{formatCurrency(Number(r.subscription_fee??0),currency)}</td><td className="px-4 py-3">{r.season||'—'}</td><td className="px-4 py-3 text-right"><button className="btn-ghost text-red-600" onClick={()=>removePlayer(r)}><X className="h-4 w-4"/></button></td></tr>)}</tbody></table></div></div>}
+  </Modal>
+ </div>
 }

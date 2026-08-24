@@ -19,3 +19,13 @@ Do not run `COMPLETE_SETUP.sql` on an existing database.
 
 ## v20 – Save confirmations
 ClubOS now includes a global notification/toast system. Core Admin, Member and Platform save/create/update/upload/delete workflows display a clear success confirmation after Supabase confirms the operation. Existing inline error handling remains in place for failed operations.
+
+## Compact v22 changes
+
+- Team records now contain team details only: name, sport, season, contact, status, description and optional logo.
+- Subscriptions are assigned per player for a team/season (Full Time, Part Time, Casual or any organisation-defined type).
+- Team roster management allows admins to search members, add/remove players and change each player's subscription.
+- Per-player subscription charges appear as pending items in the Member Portal Payments page.
+- Member Portal navigation now surfaces Shop, Donations, Payments, Events and Voting more clearly.
+- Member donations are added to pending payments.
+- `supabase/UPGRADE_COMPACT_V22.sql` is the only new SQL required for an existing database already upgraded through v21.
