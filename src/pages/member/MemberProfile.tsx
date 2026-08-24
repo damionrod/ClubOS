@@ -246,6 +246,11 @@ export function MemberProfile() {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-2xl font-bold text-slate-900">My Profile</h1><p className="text-sm text-slate-500">Update your contact, emergency and health information.</p></div><div className="flex flex-wrap gap-2"><Link to="/member" className="btn-secondary"><Home className="h-4 w-4"/> Home</Link><button disabled={saving} className="btn-primary"><Save className="h-4 w-4"/>{saving ? 'Saving…' : 'Save Changes'}</button></div></div>
     {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
     {message && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{message}</div>}
+    {member.status === 'pending' && (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <strong>Membership pending approval.</strong> Please complete your contact, address, emergency contact, medical/accessibility details and profile photo so the club has the information it needs to review your application.
+      </div>
+    )}
 
     <section className="card p-5"><div className="flex items-start justify-between gap-4"><div><h2 className="font-semibold">Profile photo</h2><p className="mt-1 text-xs text-slate-500">JPG, PNG or WebP, up to 5 MB.</p></div><span className="text-xs text-slate-400">#{member.member_number}</span></div><div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
       <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">{photoPreview ? <img src={photoPreview} alt="Profile" className="h-full w-full object-cover"/> : initials ? <span className="text-2xl font-bold text-slate-400">{initials}</span> : <UserRound className="h-10 w-10 text-slate-300"/>}</div>

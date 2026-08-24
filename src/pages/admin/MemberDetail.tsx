@@ -27,6 +27,7 @@ export function MemberDetail() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [editOpen, setEditOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const canEdit = hasPermission('members.edit');
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export function MemberDetail() {
       setLoading(false);
     }
     load();
-  }, [id, activeOrg]);
+  }, [id, activeOrg, reloadKey]);
 
   if (loading) {
     return (
@@ -105,7 +106,7 @@ export function MemberDetail() {
 
       <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
-      {canEdit && <MemberEditModal member={member} open={editOpen} onClose={()=>setEditOpen(false)} onSaved={(updated)=>{setMember(updated);}} />}
+      {canEdit && <MemberEditModal member={member} open={editOpen} onClose={()=>setEditOpen(false)} onSaved={(updated)=>{setMember(updated);setReloadKey((v)=>v+1);}} />}
 
       <div className="mt-4">
         {activeTab === 'overview' && <OverviewTab member={member} />}
