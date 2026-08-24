@@ -11,6 +11,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { Plus, Pencil, DollarSign, Users, Vote, Award } from 'lucide-react';
 import type { MembershipType } from '@/types/database';
+import { notifySuccess } from '@/lib/notifications';
 
 export function MembershipTypes() {
   const { activeOrg } = useAuth();
@@ -49,6 +50,7 @@ export function MembershipTypes() {
       await supabase.from('membership_types').insert({ ...form, organisation_id: activeOrg.id });
     }
     setModalOpen(false);
+    notifySuccess(editing ? 'Membership type updated.' : 'Membership type created.');
     const { data } = await supabase.from('membership_types').select('*').eq('organisation_id', activeOrg.id).order('sort_order');
     setTypes(data ?? []);
   }

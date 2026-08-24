@@ -3,6 +3,7 @@ import { ImagePlus, Trash2, UploadCloud, Palette, CheckCircle2, AlertCircle } fr
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useOrganisationBranding } from '@/hooks/useOrganisationBranding';
+import { notifySuccess } from '@/lib/notifications';
 
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
@@ -117,7 +118,7 @@ export function BrandingSettings() {
       setPreviewUrl(null);
       await refresh();
       window.dispatchEvent(new CustomEvent('clubos-branding-updated', { detail: { organisationId: activeOrg.id } }));
-      setMessage('Branding saved successfully.');
+      setMessage('Branding saved successfully.'); notifySuccess('Branding saved successfully.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to save branding.');
     } finally {

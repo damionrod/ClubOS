@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField, Select, TextArea, TextInput } from '@/components/ui/FormField';
 import { hasModuleAccess, hasPermission } from '@/lib/permissions';
 import { formatDate } from '@/lib/utils';
+import { notifySuccess } from '@/lib/notifications';
 
 type AwardType = { id:string; name:string; description:string|null; category:string; is_active:boolean };
 type MemberOption = { id:string; member_number:string; first_name:string; last_name:string; preferred_name:string|null; email:string|null };
@@ -50,8 +51,8 @@ export function AwardsRecognition() {
   async function saveType(e:FormEvent){e.preventDefault(); if(!activeOrg||!canManage||!typeForm.name.trim())return;
     const payload={organisation_id:activeOrg.id,name:typeForm.name.trim(),description:typeForm.description||null,category:typeForm.category||'recognition',is_active:true};
     const result=editingType?await supabase.from('award_types').update(payload).eq('id',editingType):await supabase.from('award_types').insert(payload);
-    if(result.error)return setMessage(result.error.message); setMessage('Award type saved.'); setTypeForm(emptyType);setEditingType(null);setShowTypeForm(false);await load();}
-  async function deleteType(id:string){if(!canManage||!confirm('Delete this award type? This is only possible when it has not been used.'))return; const {error}=await supabase.from('award_types').delete().eq('id',id); setMessage(error?.message??'Award type deleted.'); if(!error)await load();}
+    if(result.error)return setMessage(result.error.message); setMessage('Award type saved.'); notifySuccess('Award type saved.'); setTypeForm(emptyType);setEditingType(null);setShowTypeForm(false);await load();}
+  async function deleteType(id:string){if(!canManage||!confirm('Delete this award type? This is only possible when it has not been used.'))return; const {error}=await supabase.from('award_types').delete().eq('id',id); setMessage(error?.message??'Award type deleted.'); if(!error){notifySuccess('Award type deleted.');await load();}}
   function editType(t:AwardType){setTypeForm({name:t.name,description:t.description??'',category:t.category});setEditingType(t.id);setShowTypeForm(true);}
 
   async function saveAward(e:FormEvent){e.preventDefault(); if(!activeOrg||!canManage||!awardForm.member_id||!awardForm.award_type_id)return;
@@ -59,7 +60,7 @@ export function AwardsRecognition() {
     const result=editingAward?await supabase.from('member_awards').update(payload).eq('id',editingAward):await supabase.from('member_awards').insert(payload);
     if(result.error)return setMessage(result.error.message); setMessage('Award recorded on the member profile.');setAwardForm(emptyAward);setEditingAward(null);setSearch('');setShowAwardForm(false);await load();}
   function editAward(a:AwardRow){setAwardForm({award_type_id:a.award_type_id,member_id:a.member_id,awarded_on:a.awarded_on,award_year:a.award_year?.toString()??'',season:a.season??'',citation:a.citation??'',notes:a.notes??'',visibility:a.visibility});setEditingAward(a.id);setShowAwardForm(true);setSearch('');}
-  async function deleteAward(id:string){if(!canManage||!confirm('Remove this award from the member history?'))return; const {error}=await supabase.from('member_awards').delete().eq('id',id);setMessage(error?.message??'Award removed.');if(!error)await load();}
+  async function deleteAward(id:string){if(!canManage||!confirm('Remove this award from the member history?'))return; const {error}=await supabase.from('member_awards').delete().eq('id',id);setMessage(error?.message??'Award removed.');if(!error){notifySuccess('Award removed.');await load();}}
 
   return <div className="space-y-6">
     <PageHeader title="Awards & Recognition" description="Create award types and build a permanent recognition history for your members." actions={canManage?<div className="flex gap-2"><button className="btn-secondary" onClick={()=>{setShowTypeForm(true);setEditingType(null);setTypeForm(emptyType)}}><Plus className="h-4 w-4"/> Award Type</button><button className="btn-primary" onClick={()=>{setShowAwardForm(true);setEditingAward(null);setAwardForm(emptyAward)}}><Award className="h-4 w-4"/> Give Award</button></div>:undefined}/>

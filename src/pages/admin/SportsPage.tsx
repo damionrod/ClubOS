@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Modal } from '@/components/ui/Modal';
 import { FormField, TextInput } from '@/components/ui/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { notifySuccess } from '@/lib/notifications';
 
 interface SportRecord {
   id: string;
@@ -58,7 +59,7 @@ export function SportsPage() {
       : await supabase.from('sports').insert(payload);
     setSaving(false);
     if (error) { alert(error.message); return; }
-    setOpen(false); await load();
+    setOpen(false); notifySuccess(editing ? 'Sport updated.' : 'Sport created.'); await load();
   }
 
   async function remove(s: SportRecord) {

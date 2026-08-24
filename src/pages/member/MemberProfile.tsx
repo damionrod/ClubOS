@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { FormField, Select, TextArea, TextInput } from '@/components/ui/FormField';
+import { notifySuccess } from '@/lib/notifications';
 
 type MemberRow = {
   id: string;
@@ -30,6 +31,7 @@ type MemberRow = {
 type Emergency = { id?: string; full_name: string; relationship: string; mobile: string; alternative_phone: string; email: string };
 type Medical = { id?: string; medical_conditions: string; allergies: string; medication: string; existing_injuries: string; accessibility_requirements: string; dietary_requirements: string; emergency_notes: string };
 type TeamOption = { id:string; name:string; season:string|null };
+type SubscriptionOption = { id:string; name:string; fee:number; billing_period:string; season:string|null };
 
 const emptyEmergency: Emergency = { full_name: '', relationship: '', mobile: '', alternative_phone: '', email: '' };
 const emptyMedical: Medical = { medical_conditions: '', allergies: '', medication: '', existing_injuries: '', accessibility_requirements: '', dietary_requirements: '', emergency_notes: '' };
@@ -41,6 +43,8 @@ export function MemberProfile() {
   const [medical, setMedical] = useState<Medical>(emptyMedical);
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [teamId, setTeamId] = useState('');
+  const [subscriptions,setSubscriptions]=useState<SubscriptionOption[]>([]);
+  const [subscriptionTypeId,setSubscriptionTypeId]=useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -79,13 +83,14 @@ export function MemberProfile() {
         supabase.from('member_emergency_contacts').select('id,full_name,relationship,mobile,alternative_phone,email').eq('member_id', memberData.id).order('sort_order').limit(1).maybeSingle(),
         supabase.from('member_medical_information').select('id,medical_conditions,allergies,medication,existing_injuries,accessibility_requirements,dietary_requirements,emergency_notes').eq('member_id', memberData.id).maybeSingle(),
         supabase.from('teams').select('id,name,season').eq('organisation_id', activeOrg.id).eq('status','active').eq('is_archived',false).order('name'),
-        supabase.from('team_members').select('team_id').eq('member_id', memberData.id).eq('role','player').limit(1).maybeSingle(),
+        supabase.from('team_members').select('team_id,subscription_type_id,season').eq('member_id', memberData.id).eq('role','player').order('created_at',{ascending:false}).limit(1).maybeSingle(),
         supabase.from('member_awards').select('id,awarded_on,award_year,season,citation,visibility,award_types(name,description)').eq('member_id', memberData.id).order('awarded_on',{ascending:false}),
       ]);
       if (!cancelled) {
         setMember(memberData as MemberRow);
         setTeams((teamOptions ?? []) as TeamOption[]);
         setTeamId(currentTeam?.team_id ?? '');
+        setSubscriptionTypeId(currentTeam?.subscription_type_id ?? '');
         setAwards(awardData ?? []);
         setPhotoPreview(memberData.photo_url ?? '');
         setEmergency(emergencyData ? {
@@ -101,6 +106,17 @@ export function MemberProfile() {
     })();
     return () => { cancelled = true; };
   }, [user?.id, activeOrg?.id]);
+
+  useEffect(()=>{
+    setSubscriptions([]);
+    if(!activeOrg||!teamId){setSubscriptionTypeId('');return;}
+    supabase.rpc('get_signup_team_subscriptions',{p_org_id:activeOrg.id,p_team_id:teamId}).then(({data,error})=>{
+      if(error){setError(error.message);return;}
+      const rows=(data??[]) as SubscriptionOption[]; setSubscriptions(rows);
+      if(subscriptionTypeId && rows.some(r=>r.id===subscriptionTypeId)) return;
+      if(rows.length===1) setSubscriptionTypeId(rows[0].id); else setSubscriptionTypeId('');
+    });
+  },[activeOrg?.id,teamId]);
 
   const initials = useMemo(() => member ? `${member.first_name?.[0] ?? ''}${member.last_name?.[0] ?? ''}` : '', [member]);
   const updateMember = (key: keyof MemberRow, value: string) => setMember(m => m ? { ...m, [key]: value } : m);
@@ -162,14 +178,19 @@ export function MemberProfile() {
         setMedical(v => ({ ...v, id: data.id }));
       }
 
-      // Members may maintain their own player-team assignment. Other role assignments
-      // such as captain/manager are left untouched.
-      const { error: clearTeamError } = await supabase.from('team_members').delete().eq('member_id', member.id).eq('role', 'player');
-      if (clearTeamError) throw clearTeamError;
+      // Keep team/subscription history by season. Only the selected season is replaced;
+      // previous seasons remain available as a historical record.
       if (teamId) {
         const selectedTeam = teams.find(t => t.id === teamId);
+        const season=selectedTeam?.season || null;
+        if(subscriptions.length>0 && !subscriptionTypeId) throw new Error('Please select your subscription for this team and season.');
+        let clearQuery=supabase.from('team_members').delete().eq('member_id',member.id).eq('role','player');
+        clearQuery=season?clearQuery.eq('season',season):clearQuery.is('season',null);
+        const {error:clearTeamError}=await clearQuery; if(clearTeamError) throw clearTeamError;
+        const selectedSubscription=subscriptions.find(s=>s.id===subscriptionTypeId);
         const { error: addTeamError } = await supabase.from('team_members').insert({
-          organisation_id: activeOrg.id, team_id: teamId, member_id: member.id, season: selectedTeam?.season || null, role: 'player'
+          organisation_id: activeOrg.id, team_id: teamId, member_id: member.id, season, role: 'player',
+          subscription_type_id: subscriptionTypeId||null, subscription_fee:selectedSubscription?.fee??null, subscription_status:'active'
         });
         if (addTeamError) throw addTeamError;
       }
@@ -181,7 +202,7 @@ export function MemberProfile() {
       setMember(m => m ? { ...m, photo_url: photoUrl } : m);
       setPhotoPreview(photoUrl ?? '');
       setPhoto(null);
-      setMessage('Your profile has been updated successfully.');
+      setMessage('Your profile has been updated successfully.'); notifySuccess('Profile saved successfully.');
     } catch (err: any) {
       setError(err?.message ?? 'Unable to update your profile.');
     } finally {
@@ -202,7 +223,7 @@ export function MemberProfile() {
       if (memberError) throw memberError;
       await supabase.from('profiles').update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq('id', user.id);
       setMember(m => m ? { ...m, photo_url: publicUrl } : m);
-      setPhotoPreview(publicUrl); setPhoto(null); setMessage('Profile photo uploaded successfully.');
+      setPhotoPreview(publicUrl); setPhoto(null); setMessage('Profile photo uploaded successfully.'); notifySuccess('Profile photo uploaded successfully.');
       await refresh();
     } catch (err: any) {
       setError(err?.message ?? 'Unable to upload your profile photo.');
@@ -215,7 +236,7 @@ export function MemberProfile() {
     const { error: updateError } = await supabase.from('members').update({ photo_url: null }).eq('id', member.id).eq('user_id', user?.id ?? '');
     if (!updateError && user) await supabase.from('profiles').update({ avatar_url: null, updated_at: new Date().toISOString() }).eq('id', user.id);
     if (updateError) { setError(updateError.message); return; }
-    setMember({ ...member, photo_url: null }); setPhoto(null); setPhotoPreview(''); setMessage('Profile photo removed.');
+    setMember({ ...member, photo_url: null }); setPhoto(null); setPhotoPreview(''); setMessage('Profile photo removed.'); notifySuccess('Profile photo removed.');
   }
 
   if (loading) return <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="card h-32 animate-pulse" />)}</div>;
@@ -250,7 +271,7 @@ export function MemberProfile() {
     </div><p className="mt-3 text-xs text-slate-500">Changing the contact email here does not change your ClubOS sign-in email.</p></section>
 
 
-    <section className="card p-5"><h2 className="font-semibold">Team</h2><p className="mt-1 text-xs text-slate-500">Select the active team you participate in. You can update this later.</p><div className="mt-4 max-w-xl"><FormField label="My team"><Select value={teamId} onChange={e=>setTeamId(e.target.value)}><option value="">No team selected</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}{t.season?` · ${t.season}`:''}</option>)}</Select></FormField></div></section>
+    <section className="card p-5"><h2 className="font-semibold">Team & season subscription</h2><p className="mt-1 text-xs text-slate-500">Choose your team and how you are participating for that team’s season. Your previous-season selections remain in club history.</p><div className="mt-4 grid max-w-3xl gap-4 md:grid-cols-2"><FormField label="My team"><Select value={teamId} onChange={e=>{setTeamId(e.target.value);setSubscriptionTypeId('')}}><option value="">No team selected</option>{teams.map(t=><option key={t.id} value={t.id}>{t.name}{t.season?` · ${t.season}`:''}</option>)}</Select></FormField>{teamId&&<FormField label="My subscription" required={subscriptions.length>0}><Select value={subscriptionTypeId} onChange={e=>setSubscriptionTypeId(e.target.value)}><option value="">Select subscription</option>{subscriptions.map(s=><option key={s.id} value={s.id}>{s.name} · {Number(s.fee).toFixed(2)}{s.season?` · ${s.season}`:''}</option>)}</Select></FormField>}</div></section>
 
     <section className="card p-5"><h2 className="font-semibold">Emergency contact</h2><div className="mt-4 grid gap-4 md:grid-cols-2">
       <FormField label="Full name"><TextInput value={emergency.full_name} onChange={e=>setEmergency(v=>({...v,full_name:e.target.value}))}/></FormField>

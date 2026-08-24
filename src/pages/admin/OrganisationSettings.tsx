@@ -3,6 +3,7 @@ import { AlertTriangle, Save } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { SUPPORTED_CURRENCIES } from '@/lib/currencies';
+import { notifySuccess } from '@/lib/notifications';
 
 type Settings = {
   currency: string;
@@ -61,7 +62,7 @@ export function OrganisationSettings() {
     if (error) setMessage(error.message);
     else {
       setOriginalCurrency(settings.currency);
-      setMessage('Organisation settings saved.');
+      setMessage('Organisation settings saved.'); notifySuccess('Organisation settings saved.');
     }
   }
 

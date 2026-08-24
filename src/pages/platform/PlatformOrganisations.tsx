@@ -3,6 +3,7 @@ import { Building2, Plus, Search, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Modal } from '@/components/ui/Modal';
 import { SUPPORTED_CURRENCIES } from '@/lib/currencies';
+import { notifySuccess } from '@/lib/notifications';
 
 type Plan = { id:string; name:string; description:string|null; price:number; billing_cycle:string; member_limit:number|null; is_active:boolean };
 type Organisation = { id:string; legal_name:string; trading_name:string; slug:string; organisation_type:string; email:string|null; city:string|null; country:string; status:string; subscriptions?: Array<{status:string; plan_id:string; subscription_plans?: {name:string; price:number}|null}> };
@@ -38,7 +39,7 @@ export function PlatformOrganisations(){
     if(subError){await supabase.from('organisations').delete().eq('id',org.id);setError(subError.message);setSaving(false);return}
     const { error: settingsError } = await supabase.from('organisation_settings').insert({organisation_id:org.id,currency:form.currency}).select();
     if(settingsError){await supabase.from('subscriptions').delete().eq('organisation_id',org.id);await supabase.from('organisations').delete().eq('id',org.id);setError(settingsError.message);setSaving(false);return}
-    setForm(emptyForm); setOpen(false); setSaving(false); await load();
+    setForm(emptyForm); setOpen(false); setSaving(false); notifySuccess('Organisation created successfully.'); await load();
   }
   return <div className="space-y-6">
     <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">Organisations</h1><p className="mt-1 text-sm text-slate-500">Create and manage ClubOS organisations and assign a subscription plan.</p></div><button onClick={()=>{setError('');setForm({...emptyForm,plan_id:plans[0]?.id??''});setOpen(true)}} className="btn-primary inline-flex items-center gap-2"><Plus className="h-4 w-4"/>Create Organisation</button></div>

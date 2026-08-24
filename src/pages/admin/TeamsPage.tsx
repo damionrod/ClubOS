@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { Trophy, Plus, Users, Pencil, Trash2, Settings2 } from 'lucide-react';
 import type { Sport } from '@/types/database';
+import { notifySuccess } from '@/lib/notifications';
 
 type SubscriptionType={id:string;name:string;fee:number;billing_period:string;is_active:boolean};
 type Team=any;
@@ -124,6 +125,7 @@ export function TeamsPage() {
       return;
     }
     setModalOpen(false);
+    notifySuccess(editing ? 'Team updated successfully.' : 'Team created successfully.');
     await load();
   }
 
@@ -132,7 +134,7 @@ export function TeamsPage() {
     if (!window.confirm(`Delete team “${team.name}”? Team player assignments for this team will also be removed.`)) return;
     const { error } = await supabase.from('teams').delete().eq('id', team.id).eq('organisation_id', activeOrg.id);
     if (error) alert(error.message);
-    else await load();
+    else { notifySuccess('Team deleted.'); await load(); }
   }
 
   async function updateDefaultSubscription(value: string) {
@@ -145,7 +147,7 @@ export function TeamsPage() {
     if (error) {
       alert(error.message);
       await load();
-    }
+    } else { notifySuccess('Default team subscription saved.'); }
   }
 
   return (
