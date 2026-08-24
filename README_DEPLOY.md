@@ -37,3 +37,9 @@ The member event page is `/member/events`. The existing demo owner account is li
 
 ## QR implementation note
 The member ticket page renders QR images from api.qrserver.com using only the random ticket token (no member personal information is sent in the QR payload). Admin scanning uses the browser camera with BarcodeDetector where supported and always includes manual-code fallback. For a production launch, replacing the external QR renderer with a bundled QR library is recommended so QR generation has no third-party runtime dependency.
+
+## v10 — Organisation currency
+For an existing database, run:
+`supabase/migrations/20260824170000_016_organisation_currency.sql`
+
+Platform Admin selects the currency when creating an organisation. Organisation admins can review/change it under Settings → Organisation Settings. Historical transaction amounts are not automatically converted when currency is changed.
