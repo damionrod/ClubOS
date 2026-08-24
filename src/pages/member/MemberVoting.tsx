@@ -19,7 +19,7 @@ export function MemberVoting() {
   async function vote(motion:Motion,choice:'yes'|'no'|'abstain'){
     if(!activeOrg||!user)return; setSaving(motion.id);setMessage('');setError('');
     const {error}=await supabase.rpc('cast_motion_vote',{p_motion_id:motion.id,p_choice:choice});
-    if(error)setError(error.message); else {setMessage('Your vote has been recorded.'); await load();}
+    if(error)setError(error.message); else {setMessage(m.my_choice ? 'Your vote has been updated.' : 'Your vote has been recorded.'); await load();}
     setSaving('');
   }
   return <div className="space-y-6">
@@ -29,7 +29,51 @@ export function MemberVoting() {
     <div className="space-y-4">{motions.map(m=>{const open=m.status==='open'&&(!m.closes_at||new Date(m.closes_at)>new Date());return <div key={m.id} className={`card p-5 ${open&&!m.my_choice?'ring-2 ring-primary-200':''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><h3 className="font-semibold text-slate-900">{m.title}</h3>{open&&!m.my_choice&&<span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Vote required</span>}</div><p className="mt-2 text-sm text-slate-600">{m.description}</p></div>{m.my_choice&&<span className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700"><CheckCircle2 className="h-3.5 w-3.5"/> Voted: {m.my_choice}</span>}</div>
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500"><span className="flex items-center gap-1">{m.voting_audience==='committee_only'?<ShieldCheck className="h-4 w-4"/>:<Users className="h-4 w-4"/>}{m.voting_audience==='committee_only'?'Committee members only':'All eligible members'}</span><span className="flex items-center gap-1"><Clock3 className="h-4 w-4"/>{m.closes_at?`Closes ${new Date(m.closes_at).toLocaleString('en-NZ',{dateStyle:'medium',timeStyle:'short'})}`:'No closing date'}</span><span>{m.voting_method==='secret'?'Secret ballot':'Named ballot'}</span></div>
-      {open&&!m.my_choice?<div className="mt-5 grid grid-cols-3 gap-2"><button disabled={saving===m.id} onClick={()=>vote(m,'yes')} className="btn-primary justify-center">Yes</button><button disabled={saving===m.id} onClick={()=>vote(m,'no')} className="btn-secondary justify-center">No</button><button disabled={saving===m.id} onClick={()=>vote(m,'abstain')} className="btn-secondary justify-center">Abstain</button></div>:<div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs"><div className="rounded bg-slate-50 p-2"><b className="block text-base text-slate-900">{m.yes_votes}</b>Yes</div><div className="rounded bg-slate-50 p-2"><b className="block text-base text-slate-900">{m.no_votes}</b>No</div><div className="rounded bg-slate-50 p-2"><b className="block text-base text-slate-900">{m.abstain_votes}</b>Abstain</div></div>}
+      {open ? (
+        <div className="mt-5">
+          {m.my_choice && (
+            <p className="mb-3 text-xs text-slate-500">
+              You can change your vote while this motion is open. Your latest selection replaces your previous vote.
+            </p>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              disabled={saving===m.id}
+              onClick={()=>vote(m,'yes')}
+              className={m.my_choice==='yes' ? 'btn-primary justify-center' : 'btn-secondary justify-center'}
+            >
+              {m.my_choice==='yes' ? '✓ Yes' : 'Yes'}
+            </button>
+            <button
+              disabled={saving===m.id}
+              onClick={()=>vote(m,'no')}
+              className={m.my_choice==='no' ? 'btn-primary justify-center' : 'btn-secondary justify-center'}
+            >
+              {m.my_choice==='no' ? '✓ No' : 'No'}
+            </button>
+            <button
+              disabled={saving===m.id}
+              onClick={()=>vote(m,'abstain')}
+              className={m.my_choice==='abstain' ? 'btn-primary justify-center' : 'btn-secondary justify-center'}
+            >
+              {m.my_choice==='abstain' ? '✓ Abstain' : 'Abstain'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5">
+          {m.my_choice && (
+            <p className="mb-3 text-xs font-medium text-slate-600">
+              Final vote: {m.my_choice}. Voting is closed and can no longer be changed.
+            </p>
+          )}
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="rounded bg-slate-50 p-2"><b className="block text-base text-slate-900">{m.yes_votes}</b>Yes</div>
+            <div className="rounded bg-slate-50 p-2"><b className="block text-base text-slate-900">{m.no_votes}</b>No</div>
+            <div className="rounded bg-slate-50 p-2"><b className="block text-base text-slate-900">{m.abstain_votes}</b>Abstain</div>
+          </div>
+        </div>
+      )}
     </div>})}</div>}
   </div>;
 }
