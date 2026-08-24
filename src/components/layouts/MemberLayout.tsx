@@ -10,7 +10,7 @@ import { usePendingVotes } from '@/hooks/usePendingVotes';
 const desktopNav=[
  {label:'Home',icon:Home,path:'/member'},{label:'Membership',icon:User,path:'/member/membership'},{label:'Events',icon:Calendar,path:'/member/events'},
  {label:'Payments',icon:CreditCard,path:'/member/payments'},{label:'Shop',icon:ShoppingBag,path:'/member/merchandise'},{label:'Donate',icon:Heart,path:'/member/donations'},
- {label:'Voting',icon:Vote,path:'/member/voting'},{label:'News',icon:Newspaper,path:'/member/news'},
+ {label:'Voting',icon:Vote,path:'/member/voting'},{label:'News',icon:Newspaper,path:'/member/news'},{label:'More',icon:MoreHorizontal,path:'/member/more'},
 ];
 const mobileNav=[{label:'Home',icon:Home,path:'/member'},{label:'Events',icon:Calendar,path:'/member/events'},{label:'Payments',icon:CreditCard,path:'/member/payments'},{label:'Shop',icon:ShoppingBag,path:'/member/merchandise'},{label:'More',icon:MoreHorizontal,path:'/member/more'}];
 

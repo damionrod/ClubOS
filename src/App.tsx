@@ -29,6 +29,7 @@ import { MemberEvents } from '@/pages/member/MemberEvents';
 import { MemberDashboard } from '@/pages/member/MemberDashboard';
 import { PlatformDashboard } from '@/pages/platform/PlatformDashboard';
 import { DemoModulePage } from '@/pages/admin/DemoModules';
+import { CommunicationsRecords, CommitteeRecords, ContactRecords, DocumentRecords } from '@/pages/admin/EnhancedRecords';
 import { PlatformDemoPage } from '@/pages/platform/PlatformDemoPages';
 import { PlatformOrganisations } from '@/pages/platform/PlatformOrganisations';
 import { PlatformFeeSettings } from '@/pages/platform/PlatformFeeSettings';
@@ -120,17 +121,17 @@ function AppRoutes() {
       <Route path="/admin/reports/income-by-category" element={<ProtectedRoute><PermissionLoader><AdminRoute><IncomeByCategoryReport /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/events" element={<ProtectedRoute><PermissionLoader><AdminRoute><EventsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/events/checkin" element={<ProtectedRoute><PermissionLoader><AdminRoute><EventCheckin /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/communications" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="communications" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/communications" element={<ProtectedRoute><PermissionLoader><AdminRoute><CommunicationsRecords /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/communications/send" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="send" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/communications/history" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="history" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/governance" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="governance" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/governance/committee" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="committee" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/governance/committee" element={<ProtectedRoute><PermissionLoader><AdminRoute><CommitteeRecords /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/governance/motions" element={<ProtectedRoute><PermissionLoader><AdminRoute><MotionsPage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/governance/awards" element={<ProtectedRoute><PermissionLoader><AdminRoute><AwardsRecognition /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/documents" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="documents" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/documents" element={<ProtectedRoute><PermissionLoader><AdminRoute><DocumentRecords /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/merchandise" element={<ProtectedRoute><PermissionLoader><AdminRoute><MerchandisePage /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/donations" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="donations" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
-      <Route path="/admin/contacts" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="contacts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
+      <Route path="/admin/contacts" element={<ProtectedRoute><PermissionLoader><AdminRoute><ContactRecords /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/contracts" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="contracts" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/tasks" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="tasks" /></AdminRoute></PermissionLoader></ProtectedRoute>} />
       <Route path="/admin/privacy" element={<ProtectedRoute><PermissionLoader><AdminRoute><DemoModulePage kind="privacy" /></AdminRoute></PermissionLoader></ProtectedRoute>} />

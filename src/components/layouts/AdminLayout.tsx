@@ -48,9 +48,9 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     title: 'Operations',
     items: [
       {
-        label: 'Teams & Sports', icon: <Trophy className="h-4 w-4" />, module: 'teams',
+        label: 'Teams & Groups', icon: <Trophy className="h-4 w-4" />, module: 'teams',
         children: [
-          { label: 'Sports', path: '/admin/sports' },
+          { label: 'Group Type', path: '/admin/sports' },
           { label: 'Teams', path: '/admin/teams' },
         ],
       },

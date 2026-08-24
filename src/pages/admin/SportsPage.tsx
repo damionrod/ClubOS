@@ -59,14 +59,14 @@ export function SportsPage() {
       : await supabase.from('sports').insert(payload);
     setSaving(false);
     if (error) { alert(error.message); return; }
-    setOpen(false); notifySuccess(editing ? 'Sport updated.' : 'Sport created.'); await load();
+    setOpen(false); notifySuccess(editing ? 'Group type updated.' : 'Group type created.'); await load();
   }
 
   async function remove(s: SportRecord) {
     if (!activeOrg) return;
     const { count } = await supabase.from('teams').select('id', { count: 'exact', head: true }).eq('organisation_id', activeOrg.id).eq('sport_id', s.id);
     if ((count ?? 0) > 0) {
-      alert(`This sport is used by ${count} team${count === 1 ? '' : 's'}. Change or delete those teams before deleting the sport.`);
+      alert(`This group type is used by ${count} team${count === 1 ? '' : 's'}. Change or delete those teams before deleting the sport.`);
       return;
     }
     if (!window.confirm(`Delete “${s.name}${s.season ? ` — ${s.season}` : ''}”?`)) return;
@@ -75,17 +75,17 @@ export function SportsPage() {
   }
 
   return <div className="space-y-6">
-    <PageHeader title="Sports" description="Create the sports and optional seasons your organisation uses. Teams select from this list." actions={<button className="btn-primary" onClick={newSport}><Plus className="h-4 w-4"/> Add Sport</button>} />
+    <PageHeader title="Group Types" description="Create the group types and optional seasons your organisation uses. Teams select from this list." actions={<button className="btn-primary" onClick={newSport}><Plus className="h-4 w-4"/> Add Group Type</button>} />
 
     {loading ? <div className="card h-32 animate-pulse"/> : sports.length === 0 ?
-      <div className="card"><EmptyState icon={<Trophy className="h-6 w-6"/>} title="No sports yet" description="Add a sport. Only the sport name is required." action={<button className="btn-primary" onClick={newSport}><Plus className="h-4 w-4"/> Add Sport</button>} /></div>
+      <div className="card"><EmptyState icon={<Trophy className="h-6 w-6"/>} title="No group types yet" description="Add a group type. Only the name is required." action={<button className="btn-primary" onClick={newSport}><Plus className="h-4 w-4"/> Add Group Type</button>} /></div>
       : <div className="card overflow-hidden"><div className="divide-y divide-slate-100">{sports.map(s => <div key={s.id} className="flex items-center justify-between gap-4 p-4">
           <div><p className="font-semibold text-slate-900">{s.name}</p><p className="text-sm text-slate-500">{s.season || 'No season specified'}</p></div>
           <div className="flex gap-2"><button className="btn-secondary" onClick={()=>editSport(s)}><Pencil className="h-4 w-4"/> Edit</button><button className="btn-ghost text-error-600" onClick={()=>remove(s)}><Trash2 className="h-4 w-4"/></button></div>
         </div>)}</div></div>}
 
-    <Modal open={open} onClose={()=>setOpen(false)} title={editing ? 'Edit Sport' : 'Add Sport'} description="Keep this simple: sport name is required; season is optional." footer={<><button className="btn-secondary" onClick={()=>setOpen(false)}>Cancel</button><button className="btn-primary" disabled={saving || !name.trim()} onClick={save}>{saving?'Saving…':'Save'}</button></>}>
-      <div className="space-y-4"><FormField label="Sport name" required><TextInput value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Cricket" /></FormField><FormField label="Season" helpText="Optional"><TextInput value={season} onChange={e=>setSeason(e.target.value)} placeholder="e.g. 2026/27" /></FormField></div>
+    <Modal open={open} onClose={()=>setOpen(false)} title={editing ? 'Edit Group Type' : 'Add Group Type'} description="Keep this simple: group type name is required; season is optional." footer={<><button className="btn-secondary" onClick={()=>setOpen(false)}>Cancel</button><button className="btn-primary" disabled={saving || !name.trim()} onClick={save}>{saving?'Saving…':'Save'}</button></>}>
+      <div className="space-y-4"><FormField label="Group type name" required><TextInput value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Cricket" /></FormField><FormField label="Season" helpText="Optional"><TextInput value={season} onChange={e=>setSeason(e.target.value)} placeholder="e.g. 2026/27" /></FormField></div>
     </Modal>
   </div>;
 }
