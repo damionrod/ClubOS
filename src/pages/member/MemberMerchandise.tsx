@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Image as ImageIcon, ShoppingBag } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Image as ImageIcon, Minus, Plus, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import { FormField, Select } from '@/components/ui/FormField';
 import { formatCurrency } from '@/lib/utils';
 import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { notifyError, notifySuccess } from '@/lib/notifications';
@@ -24,10 +23,9 @@ export function MemberMerchandise() {
   const { currency } = useOrganisationCurrency();
 
   const [rows, setRows] = useState<Product[]>([]);
-  const [selectedId, setSelectedId] = useState('');
-  const [quantity, setQuantity] = useState('1');
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
+  const [purchasing, setPurchasing] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -49,46 +47,48 @@ export function MemberMerchandise() {
         } else {
           const products = (data ?? []) as Product[];
           setRows(products);
-          if (products.length === 1) setSelectedId(products[0].id);
+          setQuantities(
+            Object.fromEntries(products.map((product) => [product.id, 1])),
+          );
         }
         setLoading(false);
       });
   }, [activeOrg?.id]);
 
-  const selected = useMemo(
-    () => rows.find((product) => product.id === selectedId) ?? null,
-    [rows, selectedId],
-  );
+  function setQuantity(product: Product, value: number) {
+    const max = Math.max(1, Math.min(product.stock_quantity, 20));
+    const next = Math.max(1, Math.min(value, max));
+    setQuantities((current) => ({ ...current, [product.id]: next }));
+  }
 
-  const qty = Math.max(1, Number.parseInt(quantity || '1', 10) || 1);
-  const total = selected ? Number(selected.price) * qty : 0;
+  async function purchase(product: Product) {
+    if (!activeOrg || !profile || purchasing) return;
 
-  async function purchase() {
-    if (!activeOrg || !profile || !selected) return;
+    const quantity = quantities[product.id] ?? 1;
 
-    if (selected.stock_quantity <= 0) {
+    if (product.stock_quantity <= 0) {
       notifyError('This item is out of stock.');
       return;
     }
 
-    if (!Number.isInteger(qty) || qty < 1 || qty > selected.stock_quantity) {
-      notifyError(`Please choose a quantity between 1 and ${selected.stock_quantity}.`);
+    if (quantity > product.stock_quantity) {
+      notifyError(`Only ${product.stock_quantity} item(s) are available.`);
       return;
     }
 
-    setPurchasing(true);
+    setPurchasing(product.id);
 
     const { error: orderError } = await supabase.from('merchandise_orders').insert({
       organisation_id: activeOrg.id,
-      product_id: selected.id,
+      product_id: product.id,
       purchaser_user_id: profile.id,
-      quantity: qty,
-      unit_price: Number(selected.price),
-      total_amount: total,
-      payment_status: Number(selected.price) === 0 ? 'free' : 'pending',
+      quantity,
+      unit_price: Number(product.price),
+      total_amount: Number(product.price) * quantity,
+      payment_status: Number(product.price) === 0 ? 'free' : 'pending',
     });
 
-    setPurchasing(false);
+    setPurchasing('');
 
     if (orderError) {
       notifyError(orderError.message);
@@ -96,128 +96,154 @@ export function MemberMerchandise() {
     }
 
     notifySuccess(
-      Number(selected.price) === 0
-        ? 'Order created successfully.'
-        : 'Order created. Payment is now pending.',
+      Number(product.price) === 0
+        ? `${product.name} added successfully.`
+        : `${product.name} order created. Payment is pending.`,
     );
-    setQuantity('1');
+
+    setQuantities((current) => ({ ...current, [product.id]: 1 }));
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Club Merchandise</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Shop</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Select an item by SKU, choose the quantity and place your order.
+          Browse club merchandise and purchase directly from each product.
         </p>
       </div>
 
-      {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
 
       {loading ? (
-        <div className="card h-40 animate-pulse" />
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="card h-96 animate-pulse" />
+          ))}
+        </div>
       ) : rows.length === 0 ? (
-        <div className="card p-8 text-center text-slate-500">
-          No merchandise is currently available.
+        <div className="card p-10 text-center">
+          <ShoppingBag className="mx-auto h-10 w-10 text-slate-300" />
+          <h3 className="mt-3 font-semibold text-slate-900">No merchandise available</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            New club products will appear here when they are available.
+          </p>
         </div>
       ) : (
-        <div className="card p-5">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
-            <FormField label="Product / SKU" required>
-              <Select
-                value={selectedId}
-                onChange={(e) => {
-                  setSelectedId(e.target.value);
-                  setQuantity('1');
-                }}
-              >
-                <option value="">Select merchandise</option>
-                {rows.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.sku ? `${product.sku} — ` : ''}{product.name} — {formatCurrency(Number(product.price), currency)}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((product) => {
+            const quantity = quantities[product.id] ?? 1;
+            const outOfStock = product.stock_quantity <= 0;
+            const total = Number(product.price) * quantity;
+            const images = [product.image_url_1, product.image_url_2].filter(Boolean);
 
-            <FormField label="Quantity" required>
-              <Select
-                value={quantity}
-                disabled={!selected || selected.stock_quantity <= 0}
-                onChange={(e) => setQuantity(e.target.value)}
-              >
-                {selected && selected.stock_quantity > 0
-                  ? Array.from(
-                      { length: Math.min(selected.stock_quantity, 20) },
-                      (_, index) => index + 1,
-                    ).map((value) => (
-                      <option key={value} value={value}>{value}</option>
-                    ))
-                  : <option value="1">0 available</option>}
-              </Select>
-            </FormField>
-          </div>
+            return (
+              <div key={product.id} className="card overflow-hidden">
+                <div className="relative bg-slate-100">
+                  {images.length > 0 ? (
+                    <div className={images.length > 1 ? 'grid grid-cols-2' : ''}>
+                      {images.map((url, index) => (
+                        <img
+                          key={index}
+                          src={url!}
+                          alt={`${product.name} ${index + 1}`}
+                          className="h-52 w-full object-cover"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-52 items-center justify-center text-slate-300">
+                      <ImageIcon className="h-10 w-10" />
+                    </div>
+                  )}
 
-          {selected && (
-            <div className="mt-5 border-t border-slate-100 pt-5">
-              <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-                <div className="grid grid-cols-2 overflow-hidden rounded-xl bg-slate-100">
-                  {[selected.image_url_1, selected.image_url_2].map((url, index) =>
-                    url ? (
-                      <img
-                        key={index}
-                        src={url}
-                        alt={`${selected.name} ${index + 1}`}
-                        className="h-40 w-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        key={index}
-                        className="flex h-40 items-center justify-center text-slate-300"
-                      >
-                        <ImageIcon className="h-7 w-7" />
-                      </div>
-                    ),
+                  {outOfStock && (
+                    <span className="absolute right-3 top-3 rounded-full bg-slate-900/80 px-3 py-1 text-xs font-semibold text-white">
+                      Out of stock
+                    </span>
                   )}
                 </div>
 
-                <div>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-900">{selected.name}</h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        SKU: {selected.sku || 'Not specified'}
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-semibold text-slate-900">
+                        {product.name}
+                      </h2>
+                      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                        SKU: {product.sku || 'N/A'}
                       </p>
                     </div>
-                    <p className="text-xl font-bold text-primary-700">
-                      {formatCurrency(Number(selected.price), currency)}
+
+                    <p className="shrink-0 text-lg font-bold text-primary-700">
+                      {formatCurrency(Number(product.price), currency)}
                     </p>
                   </div>
 
-                  {selected.description && (
-                    <p className="mt-3 text-sm text-slate-600">{selected.description}</p>
+                  {product.description && (
+                    <p className="mt-3 line-clamp-3 text-sm text-slate-600">
+                      {product.description}
+                    </p>
                   )}
 
-                  <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-600">
-                    <span>{selected.stock_quantity} available</span>
-                    <span>
-                      Total: <strong>{formatCurrency(total, currency)}</strong>
-                    </span>
+                  <p className="mt-3 text-xs text-slate-500">
+                    {outOfStock
+                      ? 'Currently unavailable'
+                      : `${product.stock_quantity} in stock`}
+                  </p>
+
+                  <div className="mt-5 flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                      <button
+                        type="button"
+                        disabled={outOfStock || quantity <= 1}
+                        onClick={() => setQuantity(product, quantity - 1)}
+                        className="flex h-10 w-10 items-center justify-center hover:bg-slate-50 disabled:opacity-40"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+
+                      <span className="min-w-10 text-center text-sm font-semibold">
+                        {outOfStock ? 0 : quantity}
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={
+                          outOfStock ||
+                          quantity >= Math.min(product.stock_quantity, 20)
+                        }
+                        onClick={() => setQuantity(product, quantity + 1)}
+                        className="flex h-10 w-10 items-center justify-center hover:bg-slate-50 disabled:opacity-40"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {!outOfStock && (
+                      <span className="text-sm text-slate-600">
+                        Total: <strong>{formatCurrency(total, currency)}</strong>
+                      </span>
+                    )}
                   </div>
 
                   <button
                     type="button"
-                    className="btn-primary mt-5"
-                    disabled={purchasing || selected.stock_quantity <= 0}
-                    onClick={purchase}
+                    className="btn-primary mt-4 w-full justify-center"
+                    disabled={outOfStock || purchasing === product.id}
+                    onClick={() => purchase(product)}
                   >
                     <ShoppingBag className="h-4 w-4" />
-                    {purchasing ? 'Creating order…' : 'Purchase'}
+                    {purchasing === product.id ? 'Adding…' : 'Buy'}
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
     </div>
