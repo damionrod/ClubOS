@@ -69,7 +69,8 @@ function ProtectedRoute({ children, requirePlatformAdmin = false }: { children: 
 }
 
 function AdminRoute({ children }: { children: ReactNode }) {
-  const { orgMemberships } = useAuth();
+  const { orgMemberships, activeRole, isActiveOwner } = useAuth();
+
   if (orgMemberships.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
@@ -82,6 +83,13 @@ function AdminRoute({ children }: { children: ReactNode }) {
       </div>
     );
   }
+
+  // A normal Member role never receives the Admin Portal simply because they
+  // have an organisation link. Pending and active members use /member.
+  if (!isActiveOwner && activeRole?.name?.trim().toLowerCase() === 'member') {
+    return <Navigate to="/member" replace />;
+  }
+
   return <AdminLayout>{children}</AdminLayout>;
 }
 

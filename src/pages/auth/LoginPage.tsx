@@ -24,22 +24,61 @@ export function LoginPage() {
       setLoading(false);
     } else {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('is_platform_admin')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (profileData?.is_platform_admin) {
-          navigate('/platform-admin');
-        } else if (user.email === 'member@demosportsclub.example') {
-          navigate('/member');
-        } else {
-          navigate('/admin');
-        }
-      } else {
-        navigate('/admin');
+
+      if (!user) {
+        navigate('/login');
+        setLoading(false);
+        return;
       }
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('is_platform_admin')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileData?.is_platform_admin) {
+        navigate('/platform-admin');
+        setLoading(false);
+        return;
+      }
+
+      // Route according to the user's actual organisation role.
+      // Ordinary members (including pending applicants) belong in the Member Portal.
+      const { data: orgLinks } = await supabase
+        .from('organisation_users')
+        .select('organisation_id, role_id, is_owner, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      const activeLink = orgLinks?.[0];
+
+      if (activeLink?.is_owner) {
+        navigate('/admin');
+        setLoading(false);
+        return;
+      }
+
+      let roleName = '';
+      if (activeLink?.role_id) {
+        const { data: roleData } = await supabase
+          .from('roles')
+          .select('name')
+          .eq('id', activeLink.role_id)
+          .maybeSingle();
+        roleName = (roleData?.name ?? '').trim().toLowerCase();
+      }
+
+      if (roleName === 'member') {
+        navigate('/member');
+      } else if (activeLink) {
+        navigate('/admin');
+      } else {
+        // A signed-in user with no organisation link still goes to the member
+        // side, where the portal can show the appropriate pending/access status.
+        navigate('/member');
+      }
+
       setLoading(false);
     }
   }
