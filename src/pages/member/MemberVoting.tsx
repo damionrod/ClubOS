@@ -35,6 +35,7 @@ export function MemberVoting() {
   const [saving, setSaving] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'active' | 'past' | 'history'>('active');
 
   async function load() {
     if (!activeOrg) {
@@ -73,6 +74,23 @@ export function MemberVoting() {
       ).length,
     [motions],
   );
+
+  const visibleMotions = useMemo(() => {
+    const now = new Date();
+    if (tab === 'history') return motions.filter((motion) => !!motion.my_choice);
+    if (tab === 'past') {
+      return motions.filter(
+        (motion) =>
+          motion.status !== 'open' ||
+          (!!motion.closes_at && new Date(motion.closes_at) <= now),
+      );
+    }
+    return motions.filter(
+      (motion) =>
+        motion.status === 'open' &&
+        (!motion.closes_at || new Date(motion.closes_at) > now),
+    );
+  }, [motions, tab]);
 
   async function vote(motion: Motion, choice: 'yes' | 'no' | 'abstain') {
     if (!activeOrg || !user || saving === motion.id) return;
@@ -129,6 +147,25 @@ export function MemberVoting() {
         }
       />
 
+      <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1">
+        {([
+          ['active', 'Active Motions'],
+          ['past', 'Past Motions'],
+          ['history', 'Voting History'],
+        ] as const).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setTab(value)}
+            className={`shrink-0 rounded-md px-3 py-2 text-sm font-medium ${
+              tab === value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {message && (
         <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-800">
           {message}
@@ -143,17 +180,23 @@ export function MemberVoting() {
 
       {loading ? (
         <div className="card h-36 animate-pulse" />
-      ) : motions.length === 0 ? (
+      ) : visibleMotions.length === 0 ? (
         <div className="card p-8 text-center">
           <Vote className="mx-auto h-10 w-10 text-slate-300" />
-          <h3 className="mt-3 font-semibold">No motions available</h3>
+          <h3 className="mt-3 font-semibold">
+            {tab === 'active' ? 'No active motions' : tab === 'past' ? 'No past motions' : 'No voting history'}
+          </h3>
           <p className="mt-1 text-sm text-slate-500">
-            When a motion opens that you are eligible to vote on, it will appear here.
+            {tab === 'active'
+              ? 'There is currently nothing requiring your vote.'
+              : tab === 'past'
+                ? 'Closed motions will appear here.'
+                : 'Motions you have voted on will appear here.'}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {motions.map((motion) => {
+          {visibleMotions.map((motion) => {
             const open =
               motion.status === 'open' &&
               (!motion.closes_at || new Date(motion.closes_at) > new Date());

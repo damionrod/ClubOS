@@ -34,6 +34,7 @@ import { PlatformDemoPage } from '@/pages/platform/PlatformDemoPages';
 import { PlatformOrganisations } from '@/pages/platform/PlatformOrganisations';
 import { PlatformFeeSettings } from '@/pages/platform/PlatformFeeSettings';
 import { MemberMembership, MemberMore } from '@/pages/member/MemberDemoPages';
+import { MemberClubHub, MemberShopHub, MemberMeHub } from '@/pages/member/MemberPortalHubs';
 import { MemberPayments } from '@/pages/member/MemberPayments';
 import { MemberDonations } from '@/pages/member/MemberDonations';
 import { MemberProfile as EditableMemberProfile } from '@/pages/member/MemberProfile';
@@ -147,6 +148,9 @@ function AppRoutes() {
       <Route path="/member" element={<ProtectedRoute><MemberLayout><MemberDashboard /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/membership" element={<ProtectedRoute><MemberLayout><MemberMembership /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/events" element={<ProtectedRoute><MemberLayout><MemberEvents /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/club" element={<ProtectedRoute><MemberLayout><MemberClubHub /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/shop" element={<ProtectedRoute><MemberLayout><MemberShopHub /></MemberLayout></ProtectedRoute>} />
+      <Route path="/member/me" element={<ProtectedRoute><MemberLayout><MemberMeHub /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/payments" element={<ProtectedRoute><MemberLayout><MemberPayments /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/more" element={<ProtectedRoute><MemberLayout><MemberMore /></MemberLayout></ProtectedRoute>} />
       <Route path="/member/profile" element={<ProtectedRoute><MemberLayout><EditableMemberProfile /></MemberLayout></ProtectedRoute>} />

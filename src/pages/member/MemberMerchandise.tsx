@@ -18,7 +18,7 @@ type Product = {
   image_url_2: string | null;
 };
 
-export function MemberMerchandise() {
+export function MemberMerchandise({ compact = false }: { compact?: boolean } = {}) {
   const { activeOrg, profile } = useAuth();
   const { currency } = useOrganisationCurrency();
 
@@ -117,12 +117,14 @@ export function MemberMerchandise() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Shop</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Browse club merchandise and purchase directly from each product.
-        </p>
-      </div>
+      {!compact && (
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Shop</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Browse club merchandise and purchase directly from each product.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>

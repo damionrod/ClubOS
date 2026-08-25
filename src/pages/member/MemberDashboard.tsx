@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Calendar, CreditCard, Heart, Newspaper, ShoppingBag,
-  User, Users, Vote
+  ArrowRight, Calendar, CreditCard, FileText, Newspaper, ShoppingBag,
+  User, Vote
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { Avatar } from '@/components/ui/Avatar';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { usePendingVotes } from '@/hooks/usePendingVotes';
@@ -14,22 +15,33 @@ import { useOrganisationCurrency } from '@/lib/useOrganisationCurrency';
 import { formatCurrency } from '@/lib/utils';
 import type { Member } from '@/types/database';
 
+type FeedItem = {
+  id: string;
+  kind: 'announcement' | 'award' | 'document' | 'event';
+  title: string;
+  date: string;
+  to: string;
+};
+
 export function MemberDashboard() {
   const { profile, activeOrg } = useAuth();
   const { currency } = useOrganisationCurrency();
   const { count: pendingVotes } = usePendingVotes(activeOrg?.id);
-  const { count: unreadUpdates } = useUnreadUpdates(activeOrg?.id, profile?.id);
+  const { count: unreadUpdates, seenAt } = useUnreadUpdates(activeOrg?.id, profile?.id);
 
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingAmount, setPendingAmount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
-  const [teamRows, setTeamRows] = useState<any[]>([]);
+  const [nextEvents, setNextEvents] = useState<any[]>([]);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
 
   useEffect(() => {
     if (!profile || !activeOrg) return;
 
     (async () => {
+      setLoading(true);
+
       const { data } = await supabase
         .from('members')
         .select('*, memberships(membership_types(*))')
@@ -39,8 +51,78 @@ export function MemberDashboard() {
 
       setMember(data as unknown as Member);
 
+      const [eventResult, postResult, awardResult, docResult] = await Promise.all([
+        supabase
+          .from('events')
+          .select('id,title,start_at,venue,public_slug,created_at')
+          .eq('organisation_id', activeOrg.id)
+          .eq('status', 'published')
+          .gte('start_at', new Date().toISOString())
+          .order('start_at')
+          .limit(3),
+        supabase
+          .from('news_posts')
+          .select('id,title,published_at')
+          .eq('organisation_id', activeOrg.id)
+          .eq('status', 'published')
+          .lte('published_at', new Date().toISOString())
+          .order('published_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('member_awards')
+          .select('id,awarded_on,award_types(name),members(first_name,last_name,preferred_name)')
+          .eq('organisation_id', activeOrg.id)
+          .eq('visibility', 'members')
+          .order('awarded_on', { ascending: false })
+          .limit(5),
+        supabase
+          .from('club_documents')
+          .select('id,title,updated_at')
+          .eq('organisation_id', activeOrg.id)
+          .in('visibility', ['members', 'public'])
+          .order('updated_at', { ascending: false })
+          .limit(5),
+      ]);
+
+      setNextEvents(eventResult.data ?? []);
+
+      const feedItems: FeedItem[] = [
+        ...(postResult.data ?? []).map((post: any) => ({
+          id: `post-${post.id}`,
+          kind: 'announcement' as const,
+          title: post.title,
+          date: post.published_at,
+          to: '/member/news',
+        })),
+        ...(awardResult.data ?? []).map((award: any) => ({
+          id: `award-${award.id}`,
+          kind: 'award' as const,
+          title: `${award.award_types?.name || 'Award'} — ${award.members?.preferred_name || award.members?.first_name || ''} ${award.members?.last_name || ''}`.trim(),
+          date: award.awarded_on,
+          to: '/member/club#awards',
+        })),
+        ...(docResult.data ?? []).map((doc: any) => ({
+          id: `doc-${doc.id}`,
+          kind: 'document' as const,
+          title: `${doc.title} uploaded`,
+          date: doc.updated_at,
+          to: '/member/club#documents',
+        })),
+        ...(eventResult.data ?? []).map((event: any) => ({
+          id: `event-${event.id}`,
+          kind: 'event' as const,
+          title: `${event.title} announced`,
+          date: event.created_at,
+          to: '/member/events',
+        })),
+      ]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5);
+
+      setFeed(feedItems);
+
       if (data?.id) {
-        const [{ data: charges }, { data: donations }, { data: teams }] = await Promise.all([
+        const [{ data: charges }, { data: donations }] = await Promise.all([
           supabase
             .from('member_subscription_charges')
             .select('amount,status')
@@ -52,36 +134,34 @@ export function MemberDashboard() {
             .eq('organisation_id', activeOrg.id)
             .eq('member_id', data.id)
             .eq('status', 'pending'),
-          supabase
-            .from('team_members')
-            .select('id,season,subscription_fee,teams(name,sports(name)),subscription_types(name)')
-            .eq('member_id', data.id)
-            .eq('role', 'player')
-            .order('created_at', { ascending: false })
-            .limit(4),
         ]);
 
-        const pendingCharges = (charges ?? []).filter((x: any) =>
-          ['pending', 'unpaid'].includes(x.status),
+        const pendingCharges = (charges ?? []).filter((item: any) =>
+          ['pending', 'unpaid'].includes(String(item.status).toLowerCase()),
         );
         const pending = [...pendingCharges, ...(donations ?? [])];
-
         setPendingAmount(pending.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
         setPendingCount(pending.length);
-        setTeamRows(teams ?? []);
       }
 
       setLoading(false);
     })();
   }, [profile?.id, activeOrg?.id]);
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
   if (loading) {
-    return <div className="space-y-4">{[1, 2].map((i) => <div key={i} className="card h-32 animate-pulse" />)}</div>;
+    return <div className="space-y-4">{[1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-white" />)}</div>;
   }
 
   if (!member) {
     return (
-      <div className="card">
+      <div className="rounded-xl border border-slate-200 bg-white">
         <EmptyState
           icon={<User className="h-6 w-6" />}
           title="No membership found"
@@ -91,113 +171,156 @@ export function MemberDashboard() {
     );
   }
 
-  const membershipType = (member as any).memberships?.[0]?.membership_types;
-  const name = (member as any).preferred_name ?? member.first_name;
+  const membershipType = (member as any).memberships?.[0]?.membership_types?.name ?? 'Member';
+  const displayName = (member as any).preferred_name ?? member.first_name;
+  const hasActions = pendingVotes > 0 || pendingCount > 0;
 
-  const quickActions = [
-    { label: 'Events', desc: 'Tickets & upcoming events', icon: Calendar, path: '/member/events' },
-    { label: 'Shop', desc: 'Club merchandise', icon: ShoppingBag, path: '/member/merchandise' },
-    { label: 'My Profile', desc: 'Update your details', icon: User, path: '/member/profile' },
-    { label: 'Donate', desc: 'Support the club', icon: Heart, path: '/member/donations' },
-  ];
+  const feedKind = {
+    announcement: 'ANNOUNCEMENT',
+    award: 'RECOGNITION',
+    document: 'DOCUMENT',
+    event: 'EVENT',
+  } as const;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Hi {name}</h1>
-        <p className="mt-1 text-sm text-slate-500">Here’s what needs your attention.</p>
-      </div>
-
-      {(pendingCount > 0 || pendingVotes > 0 || unreadUpdates > 0) && (
-        <div className="grid gap-2 sm:grid-cols-3">
-          {pendingCount > 0 && (
-            <Link to="/member/payments" className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900">
-              <CreditCard className="h-5 w-5 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold">{pendingCount} payment{pendingCount === 1 ? '' : 's'} due</p>
-                <p className="text-xs">{formatCurrency(pendingAmount, currency)}</p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
-            </Link>
-          )}
-
-          {pendingVotes > 0 && (
-            <Link to="/member/voting" className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-800">
-              <Vote className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold">{pendingVotes} vote{pendingVotes === 1 ? '' : 's'} waiting</p>
-                <p className="text-xs">Tap to vote</p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
-            </Link>
-          )}
-
-          {unreadUpdates > 0 && (
-            <Link to="/member/news" className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-blue-800">
-              <Newspaper className="h-5 w-5 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold">{unreadUpdates} new update{unreadUpdates === 1 ? '' : 's'}</p>
-                <p className="text-xs">See what’s new</p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0" />
-            </Link>
-          )}
+    <div className="space-y-7">
+      {/* Compact member header */}
+      <section className="flex items-center gap-3">
+        <Avatar
+          firstName={member.first_name}
+          lastName={member.last_name}
+          photoUrl={(member as any).photo_url}
+          size="lg"
+        />
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold text-slate-900">{greeting}, {displayName}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
+            <span>#{(member as any).member_number}</span>
+            <span>·</span>
+            <span>{membershipType}</span>
+            <span>·</span>
+            <StatusBadge status={(member as any).status} />
+          </div>
         </div>
+      </section>
+
+      {/* Action Required: only when needed */}
+      {hasActions && (
+        <section>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Action Required</p>
+          <div className="space-y-2">
+            {pendingVotes > 0 && (
+              <Link
+                to="/member/voting"
+                className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900"
+              >
+                <Vote className="h-5 w-5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{pendingVotes} motion{pendingVotes === 1 ? '' : 's'} waiting for your vote</p>
+                  <p className="text-sm text-red-700">Vote before the motion closes.</p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold">Vote now</span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </Link>
+            )}
+            {pendingCount > 0 && (
+              <Link
+                to="/member/payments"
+                className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
+              >
+                <CreditCard className="h-5 w-5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">Payment due</p>
+                  <p className="text-sm">{pendingCount} outstanding item{pendingCount === 1 ? '' : 's'} · {formatCurrency(pendingAmount, currency)}</p>
+                </div>
+                <span className="shrink-0 text-sm font-semibold">Pay now</span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </Link>
+            )}
+          </div>
+        </section>
       )}
 
-      <div className="rounded-2xl bg-gradient-to-br from-primary-700 to-primary-900 p-5 text-white shadow-md">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-primary-200">My Membership</p>
-            <p className="mt-1 text-lg font-bold">{membershipType?.name ?? 'Member'}</p>
-            <p className="mt-1 text-sm text-primary-100">#{(member as any).member_number}</p>
+      {/* Upcoming */}
+      {nextEvents.length > 0 && (
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Upcoming</p>
+            <Link to="/member/events" className="text-sm font-medium text-primary-700">View all events</Link>
           </div>
-          <StatusBadge
-            status={(member as any).status}
-            variant={(member as any).status === 'active' ? 'success' : 'warning'}
-          />
-        </div>
-        <Link to="/member/membership" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-white/90 hover:text-white">
-          View membership <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {quickActions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link key={action.path} to={action.path} className="card-hover p-4">
-              <Icon className="h-5 w-5 text-primary-700" />
-              <p className="mt-2 text-sm font-semibold text-slate-900">{action.label}</p>
-              <p className="mt-0.5 text-xs text-slate-500">{action.desc}</p>
-            </Link>
-          );
-        })}
-      </div>
-
-      {teamRows.length > 0 && (
-        <div className="card p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary-700" />
-              <h2 className="font-semibold text-slate-900">My Teams</h2>
-            </div>
-            <Link to="/member/membership" className="text-sm font-medium text-primary-700">View all</Link>
-          </div>
-          <div className="mt-3 divide-y divide-slate-100">
-            {teamRows.slice(0, 2).map((row: any) => (
-              <div key={row.id} className="py-3 first:pt-0 last:pb-0">
-                <p className="text-sm font-medium text-slate-900">{row.teams?.name || 'Team'}</p>
-                <p className="text-xs text-slate-500">
-                  {row.teams?.sports?.name ? `${row.teams.sports.name} · ` : ''}
-                  {row.season || 'Current season'}
-                  {row.subscription_types?.name ? ` · ${row.subscription_types.name}` : ''}
-                </p>
-              </div>
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white px-4">
+            {nextEvents.slice(0, 2).map((event: any) => (
+              <Link key={event.id} to="/member/events" className="flex items-center gap-4 py-4">
+                <div className="w-12 shrink-0 text-center">
+                  <p className="text-lg font-bold text-slate-900">{new Date(event.start_at).getDate()}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    {new Date(event.start_at).toLocaleString('en-NZ', { month: 'short' })}
+                  </p>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900">{event.title}</p>
+                  <p className="mt-0.5 truncate text-sm text-slate-500">
+                    {new Date(event.start_at).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}
+                    {event.venue ? ` · ${event.venue}` : ''}
+                  </p>
+                </div>
+                <ChevronRightIcon />
+              </Link>
             ))}
           </div>
-        </div>
+        </section>
       )}
+
+      {/* Latest from club */}
+      {feed.length > 0 && (
+        <section>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Latest from the Club</p>
+            <Link to="/member/news" className="text-sm font-medium text-primary-700">View all</Link>
+          </div>
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white px-4">
+            {feed.map((item, index) => {
+              const isNew = unreadUpdates > 0 && new Date(item.date).getTime() > new Date(seenAt).getTime();
+              return (
+                <Link key={item.id} to={item.to} className="flex items-start gap-3 py-4">
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${isNew ? 'bg-primary-600' : 'bg-slate-200'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isNew && <span className="text-[10px] font-bold uppercase tracking-wide text-primary-700">New</span>}
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{feedKind[item.kind]}</span>
+                    </div>
+                    <p className={`mt-1 text-sm ${isNew ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>{item.title}</p>
+                    <p className="mt-1 text-xs text-slate-400">{new Date(item.date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</p>
+                  </div>
+                  <ChevronRightIcon />
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Small quick access, not large cards */}
+      <section>
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">Quick Access</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 sm:grid-cols-4">
+          {[
+            [User, 'Member Card', '/member/me'],
+            [CreditCard, 'Payments', '/member/payments'],
+            [FileText, 'Documents', '/member/club#documents'],
+            [ShoppingBag, 'Shop', '/member/shop'],
+          ].map(([Icon, label, to]: any) => (
+            <Link key={label} to={to} className="flex items-center gap-2 py-3.5 text-sm font-medium text-slate-700 hover:text-primary-700">
+              <Icon className="h-4 w-4 text-slate-400" />
+              {label}
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
+}
+
+function ChevronRightIcon() {
+  return <ArrowRight className="h-4 w-4 shrink-0 text-slate-300" />;
 }
